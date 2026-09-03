@@ -35,3 +35,11 @@ xcuserdata/
 # User Application State & Logs
 *.log
 *.crash
+
+# Web & Next.js Build Artifacts
+web/node_modules/
+web/.next/
+web/out/
+web/.turbo/
+web/.vercel/
+*.tsbuildinfo
