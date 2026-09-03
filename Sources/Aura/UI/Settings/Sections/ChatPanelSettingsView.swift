@@ -161,7 +161,10 @@ public struct ChatPanelSettingsView: View {
                             }
                         }
 
-                        if sessionManager.isProcessing {
+                        if case .awaitingConfirmation(let request) = appState.state {
+                            confirmationBanner(request: request)
+                                .id("confirmation_banner")
+                        } else if sessionManager.isProcessing {
                             processingIndicator
                                 .id("processing_indicator")
                         }
@@ -172,6 +175,13 @@ public struct ChatPanelSettingsView: View {
                     if let lastId = sessionManager.activeSession.messages.last?.id {
                         withAnimation {
                             proxy.scrollTo(lastId, anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: appState.state) { _, newState in
+                    if case .awaitingConfirmation = newState {
+                        withAnimation {
+                            proxy.scrollTo("confirmation_banner", anchor: .bottom)
                         }
                     }
                 }
@@ -337,6 +347,58 @@ public struct ChatPanelSettingsView: View {
             return phase
         }
         return "Thinking..."
+    }
+
+    private func confirmationBanner(request: ActionConfirmationRequest) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .foregroundColor(.orange)
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(request.title)
+                        .font(.subheadline.weight(.bold))
+                    Text(request.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+
+            Text(request.commandOrAction)
+                .font(.system(size: 11, design: .monospaced))
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(NSColor.textBackgroundColor))
+                .cornerRadius(6)
+
+            HStack(spacing: 12) {
+                Spacer()
+                Button(role: .cancel) {
+                    ApprovalCoordinator.shared.deny(id: request.id)
+                } label: {
+                    Text("Deny")
+                        .frame(minWidth: 70)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    ApprovalCoordinator.shared.approve(id: request.id)
+                } label: {
+                    Text("Approve")
+                        .frame(minWidth: 70)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+            }
+        }
+        .padding(14)
+        .background(Color.orange.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+        )
+        .cornerRadius(10)
     }
 
     // MARK: - Actions

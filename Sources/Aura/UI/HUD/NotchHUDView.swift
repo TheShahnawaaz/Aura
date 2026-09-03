@@ -617,15 +617,28 @@ public struct NotchHUDView: View {
                         }
 
                     case .awaitingConfirmation(let request):
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("⚠️ Permission: \(request.title)")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(.orange)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.shield.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.system(size: 12))
+                                Text(request.title)
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                            }
+
+                            Text(request.description)
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.7))
                                 .lineLimit(1)
 
                             Text(request.commandOrAction)
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.8))
+                                .font(.system(size: 9.5, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(4)
+                                .background(Color.black.opacity(0.35))
+                                .cornerRadius(4)
                                 .lineLimit(2)
                         }
 
@@ -679,27 +692,37 @@ public struct NotchHUDView: View {
                             }
                             .font(.system(size: 10, design: .rounded))
 
-                        case .awaitingConfirmation:
+                        case .awaitingConfirmation(let request):
                             HStack(spacing: 8) {
-                                Button("Allow") {
-                                    appState.state = .processing(phase: "Executing approved action...")
+                                Button {
+                                    ApprovalCoordinator.shared.approve(id: request.id)
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "checkmark")
+                                        Text("Approve")
+                                    }
+                                    .font(.system(size: 9.5, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Color.green.opacity(0.8))
+                                    .cornerRadius(5)
                                 }
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.green.opacity(0.7))
-                                .cornerRadius(4)
 
-                                Button("Deny") {
-                                    appState.resetToIdle()
+                                Button {
+                                    ApprovalCoordinator.shared.deny(id: request.id)
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "xmark")
+                                        Text("Deny")
+                                    }
+                                    .font(.system(size: 9.5, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Color.red.opacity(0.7))
+                                    .cornerRadius(5)
                                 }
-                                .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.7))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.red.opacity(0.5))
-                                .cornerRadius(4)
                             }
                             .buttonStyle(.plain)
 

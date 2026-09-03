@@ -26,6 +26,15 @@ final class GuardrailsTests: XCTestCase {
             XCTFail("Expected requiresConfirmation for rm -rf")
         }
 
+        let rmSingleFileEvaluation = guardrails.evaluateCommand("rm ~/Desktop/temporary_file.txt")
+        XCTAssertFalse(rmSingleFileEvaluation.isSafe, "Single file deletion via rm should require confirmation")
+
+        let rmdirEvaluation = guardrails.evaluateCommand("rmdir /tmp/empty_dir")
+        XCTAssertFalse(rmdirEvaluation.isSafe, "Directory removal via rmdir should require confirmation")
+
+        let unlinkEvaluation = guardrails.evaluateCommand("unlink /tmp/old_symlink")
+        XCTAssertFalse(unlinkEvaluation.isSafe, "Unlinking a file should require confirmation")
+
         let sudoEvaluation = guardrails.evaluateCommand("sudo reboot")
         XCTAssertFalse(sudoEvaluation.isSafe)
 
