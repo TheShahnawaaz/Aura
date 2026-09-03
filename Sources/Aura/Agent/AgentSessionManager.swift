@@ -112,11 +112,22 @@ public final class AgentSessionManager: ObservableObject {
         // 2. Append user message
         let userMsg = ChatMessage(role: .user, content: cleanText, isVoice: isVoice)
         targetSession.messages.append(userMsg)
+
+        // 3. Immediately append initial assistant placeholder message for real-time progressive streaming
+        let assistantMessageId = UUID().uuidString
+        let initialAssistantMsg = ChatMessage(
+            id: assistantMessageId,
+            role: .assistant,
+            content: "",
+            toolCalls: [],
+            isVoice: isVoice
+        )
+        targetSession.messages.append(initialAssistantMsg)
         targetSession.updatedAt = Date()
         activeSession = targetSession
         updateSessionInList(targetSession)
 
-        // 3. Run ReAct Agent loop
+        // 4. Run ReAct Agent loop with real-time progressive callbacks
         var finalAnswer = "Understood."
         var executedTools: [ToolCallRecord] = []
 
@@ -124,32 +135,55 @@ public final class AgentSessionManager: ObservableObject {
             let result = try await AgentEngine.shared.runTurn(
                 session: targetSession,
                 userPrompt: cleanText,
-                isVoice: isVoice
-            ) { phase in
-                Task { @MainActor in
-                    AppState.shared.state = .processing(phase: phase)
+                isVoice: isVoice,
+                onPhaseUpdate: { phase in
+                    Task { @MainActor in
+                        AppState.shared.state = .processing(phase: phase)
+                    }
+                },
+                onToolStart: { record in
+                    Task { @MainActor in
+                        guard let sIdx = self.sessions.firstIndex(where: { $0.id == targetSession.id }),
+                              let mIdx = self.sessions[sIdx].messages.firstIndex(where: { $0.id == assistantMessageId }) else { return }
+                        self.sessions[sIdx].messages[mIdx].toolCalls.append(record)
+                        if self.activeSession.id == targetSession.id {
+                            self.activeSession = self.sessions[sIdx]
+                        }
+                    }
+                },
+                onToolFinish: { record in
+                    Task { @MainActor in
+                        guard let sIdx = self.sessions.firstIndex(where: { $0.id == targetSession.id }),
+                              let mIdx = self.sessions[sIdx].messages.firstIndex(where: { $0.id == assistantMessageId }) else { return }
+                        if let tIdx = self.sessions[sIdx].messages[mIdx].toolCalls.firstIndex(where: { $0.id == record.id || ($0.toolName == record.toolName && $0.status == .running) }) {
+                            self.sessions[sIdx].messages[mIdx].toolCalls[tIdx] = record
+                        } else {
+                            self.sessions[sIdx].messages[mIdx].toolCalls.append(record)
+                        }
+                        if self.activeSession.id == targetSession.id {
+                            self.activeSession = self.sessions[sIdx]
+                        }
+                    }
                 }
-            }
+            )
             finalAnswer = result.finalAnswer
             executedTools = result.executedTools
         } catch {
             finalAnswer = "I ran into an issue: \(error.localizedDescription)"
         }
 
-        // 4. Append assistant response message
-        let assistantMsg = ChatMessage(
-            role: .assistant,
-            content: finalAnswer,
-            toolCalls: executedTools,
-            isVoice: isVoice
-        )
-        targetSession.messages.append(assistantMsg)
-        targetSession.updatedAt = Date()
-        activeSession = targetSession
-        updateSessionInList(targetSession)
-
-        // 5. Persist to disk
-        SessionStorage.shared.saveSession(targetSession)
+        // 5. Finalize assistant response message & persist
+        if let sIdx = self.sessions.firstIndex(where: { $0.id == targetSession.id }),
+           let mIdx = self.sessions[sIdx].messages.firstIndex(where: { $0.id == assistantMessageId }) {
+            self.sessions[sIdx].messages[mIdx].content = finalAnswer
+            if !executedTools.isEmpty {
+                self.sessions[sIdx].messages[mIdx].toolCalls = executedTools
+            }
+            self.sessions[sIdx].updatedAt = Date()
+            self.activeSession = self.sessions[sIdx]
+            SessionStorage.shared.saveSession(self.sessions[sIdx])
+            targetSession = self.sessions[sIdx]
+        }
 
         // 6. Auto-titling if this is a newly created thread
         if targetSession.title == "New Conversation" && targetSession.messages.count <= 2 {

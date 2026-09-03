@@ -526,7 +526,7 @@ public struct NotchHUDView: View {
                         }
                     }
 
-                    if let assistantMsg = lastAssistantMsg {
+                    if let assistantMsg = lastAssistantMsg, !assistantMsg.content.isEmpty {
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(spacing: 4) {
                                 Image(systemName: "sparkles")

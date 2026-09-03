@@ -14,7 +14,9 @@ public final class AgentEngine: @unchecked Sendable {
         session: ConversationSession,
         userPrompt: String,
         isVoice: Bool,
-        onPhaseUpdate: (@Sendable (String) -> Void)? = nil
+        onPhaseUpdate: (@Sendable (String) -> Void)? = nil,
+        onToolStart: (@Sendable (ToolCallRecord) -> Void)? = nil,
+        onToolFinish: (@Sendable (ToolCallRecord) -> Void)? = nil
     ) async throws -> (finalAnswer: String, executedTools: [ToolCallRecord]) {
         let apiKey = LLMService.shared.resolveApiKey()
         let baseURL = LLMService.shared.resolveBaseURL()
@@ -24,14 +26,27 @@ public final class AgentEngine: @unchecked Sendable {
         // Build conversation history context prefix so the agent has full context of prior turns
         let historyContext = buildHistoryContext(session: session, currentPrompt: userPrompt)
 
-        // Setup HookRegistry for safety guardrails and tool tracking
+        // Setup HookRegistry for safety guardrails and real-time progressive tool tracking
         let hookRegistry = HookRegistry()
         let toolTracker = ToolExecutionTracker()
 
         await hookRegistry.register(.preToolUse, definition: HookDefinition(
             handler: { input in
                 let toolName = input.toolName ?? "Tool"
+                let callId = input.toolUseId ?? UUID().uuidString
                 onPhaseUpdate?("Running \(toolName)...")
+
+                var argsJson = ""
+                if let inputObj = input.toolInput,
+                   let data = try? JSONSerialization.data(withJSONObject: inputObj, options: [.prettyPrinted]),
+                   let str = String(data: data, encoding: .utf8) {
+                    argsJson = str
+                } else if let inputObj = input.toolInput {
+                    argsJson = "\(inputObj)"
+                }
+
+                let record = await toolTracker.start(id: callId, toolName: toolName, argsJson: argsJson)
+                onToolStart?(record)
                 return nil
             }
         ))
@@ -39,25 +54,14 @@ public final class AgentEngine: @unchecked Sendable {
         await hookRegistry.register(.postToolUse, definition: HookDefinition(
             handler: { input in
                 let toolName = input.toolName ?? "Tool"
+                let callId = input.toolUseId ?? UUID().uuidString
                 var outputStr = ""
                 if let out = input.toolOutput {
                     outputStr = "\(out)"
                 }
 
-                var argsJson = ""
-                if let inputObj = input.toolInput,
-                   let data = try? JSONSerialization.data(withJSONObject: inputObj),
-                   let str = String(data: data, encoding: .utf8) {
-                    argsJson = str
-                }
-
-                await toolTracker.addRecord(ToolCallRecord(
-                    toolName: toolName,
-                    argumentsJson: argsJson,
-                    output: outputStr,
-                    status: .success,
-                    latencyMs: 150
-                ))
+                let record = await toolTracker.finish(id: callId, toolName: toolName, output: outputStr, status: .success)
+                onToolFinish?(record)
                 return nil
             }
         ))
@@ -65,22 +69,11 @@ public final class AgentEngine: @unchecked Sendable {
         await hookRegistry.register(.postToolUseFailure, definition: HookDefinition(
             handler: { input in
                 let toolName = input.toolName ?? "Tool"
+                let callId = input.toolUseId ?? UUID().uuidString
                 let errStr = input.error ?? "Tool execution failed"
 
-                var argsJson = ""
-                if let inputObj = input.toolInput,
-                   let data = try? JSONSerialization.data(withJSONObject: inputObj),
-                   let str = String(data: data, encoding: .utf8) {
-                    argsJson = str
-                }
-
-                await toolTracker.addRecord(ToolCallRecord(
-                    toolName: toolName,
-                    argumentsJson: argsJson,
-                    output: errStr,
-                    status: .failure,
-                    latencyMs: 150
-                ))
+                let record = await toolTracker.finish(id: callId, toolName: toolName, output: errStr, status: .failure)
+                onToolFinish?(record)
                 return nil
             }
         ))
@@ -92,6 +85,19 @@ public final class AgentEngine: @unchecked Sendable {
         if !activeSkillReg.allSkills.isEmpty {
             allTools.append(createSkillTool(registry: activeSkillReg))
         }
+
+        // Hard-block unconfigured OpenAgentSDK base tools and disabled Aura tools
+        var disallowed = [
+            "WebFetch", "WebSearch", "Bash", "Read", "Write",
+            "Edit", "Glob", "Grep", "AskUser", "ToolSearch", "PauseForHuman"
+        ]
+        let (compOn, termOn, scriptOn) = await MainActor.run {
+            let cfg = CapabilityConfigManager.shared
+            return (cfg.isComputerEnabled, cfg.isTerminalEnabled, cfg.isMacScriptEnabled)
+        }
+        if !compOn { disallowed.append("computer") }
+        if !termOn { disallowed.append("terminal") }
+        if !scriptOn { disallowed.append("mac_script") }
 
         let toolListSummary = allTools.map { $0.name }.joined(separator: ", ")
         let skillListSummary = activeSkillReg.allSkills.map { $0.name }.joined(separator: ", ")
@@ -123,7 +129,8 @@ public final class AgentEngine: @unchecked Sendable {
             tools: allTools,
             mcpServers: mcpConfigs,
             hookRegistry: hookRegistry,
-            skillRegistry: activeSkillReg
+            skillRegistry: activeSkillReg,
+            disallowedTools: disallowed
         )
 
         let agent = createAgent(options: options)
@@ -135,11 +142,9 @@ public final class AgentEngine: @unchecked Sendable {
         var answer = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         if answer.isEmpty {
             if let errors = result.errors, !errors.isEmpty {
-                answer = "OpenAgentSDK Error: \(errors.joined(separator: ", "))"
-            } else if let last = executed.last?.output, !last.isEmpty {
-                answer = last
+                answer = "Error: " + errors.joined(separator: "\n")
             } else {
-                answer = "I processed your request, but received no message output."
+                answer = "Completed turn with no final text."
             }
         }
 
@@ -147,30 +152,66 @@ public final class AgentEngine: @unchecked Sendable {
     }
 
     private func buildHistoryContext(session: ConversationSession, currentPrompt: String) -> String {
-        let history = session.messages.filter { $0.content != currentPrompt }.suffix(15)
-        guard !history.isEmpty else {
-            return currentPrompt
-        }
+        let history = session.messages.suffix(6)
+        guard !history.isEmpty else { return currentPrompt }
 
-        var context = "=== PRIOR CONVERSATION HISTORY ===\n"
+        var lines: [String] = []
+        lines.append("CONVERSATION CONTEXT SO FAR:")
         for msg in history {
-            let role = msg.role == .user ? "User" : "Aura"
-            context += "[\(role)]: \(msg.content)\n"
-            for t in msg.toolCalls {
-                let status = t.status == .success ? "SUCCESS" : "FAILED"
-                context += "  ↳ [Tool \(t.toolName) (\(status))]: \(t.output.prefix(150))\n"
+            let roleLabel = msg.role == .user ? "User" : "Assistant"
+            lines.append("\(roleLabel): \(msg.content)")
+            if !msg.toolCalls.isEmpty {
+                let toolSummaries = msg.toolCalls.map {
+                    let statusTag = $0.status == .success ? "(SUCCESS)" : "(FAILED)"
+                    let trimmedOutput = $0.output.prefix(120).replacingOccurrences(of: "\n", with: " ")
+                    return "\($0.toolName) \(statusTag): \(trimmedOutput)"
+                }.joined(separator: " | ")
+                lines.append("  [Tool calls: \(toolSummaries)]")
             }
         }
-        context += "=== END CONVERSATION HISTORY ===\n\n"
-        context += "Current User Query: \(currentPrompt)"
-        return context
+        lines.append("\nCURRENT USER REQUEST:\n\(currentPrompt)")
+        return lines.joined(separator: "\n")
     }
 }
 
 actor ToolExecutionTracker {
     var records: [ToolCallRecord] = []
+    private var startTimes: [String: CFAbsoluteTime] = [:]
 
-    func addRecord(_ record: ToolCallRecord) {
+    func start(id: String, toolName: String, argsJson: String) -> ToolCallRecord {
+        startTimes[id] = CFAbsoluteTimeGetCurrent()
+        let record = ToolCallRecord(
+            id: id,
+            toolName: toolName,
+            argumentsJson: argsJson,
+            output: "",
+            status: .running,
+            latencyMs: 0
+        )
         records.append(record)
+        return record
+    }
+
+    func finish(id: String, toolName: String, output: String, status: ToolCallRecord.Status) -> ToolCallRecord {
+        let started = startTimes[id] ?? CFAbsoluteTimeGetCurrent()
+        let elapsed = max(Int((CFAbsoluteTimeGetCurrent() - started) * 1000), 1)
+
+        if let idx = records.firstIndex(where: { $0.id == id || ($0.toolName == toolName && $0.status == .running) }) {
+            records[idx].output = output
+            records[idx].status = status
+            records[idx].latencyMs = elapsed
+            return records[idx]
+        } else {
+            let rec = ToolCallRecord(
+                id: id,
+                toolName: toolName,
+                argumentsJson: "",
+                output: output,
+                status: status,
+                latencyMs: elapsed
+            )
+            records.append(rec)
+            return rec
+        }
     }
 }

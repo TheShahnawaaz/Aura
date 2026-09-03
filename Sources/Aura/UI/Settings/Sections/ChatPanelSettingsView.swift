@@ -454,11 +454,11 @@ public struct ChatPanelSettingsView: View {
 
 /// Expandable card representing an autonomous tool call.
 public struct ToolCallCardView: View {
-    @State public var toolCall: ToolCallRecord
+    public let toolCall: ToolCallRecord
     @State private var isExpanded: Bool = false
 
     public init(toolCall: ToolCallRecord) {
-        self._toolCall = State(initialValue: toolCall)
+        self.toolCall = toolCall
     }
 
     public var body: some View {
@@ -492,10 +492,16 @@ public struct ToolCallCardView: View {
                     Spacer()
 
                     // Status Pill
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: 6, height: 6)
+                    HStack(spacing: 5) {
+                        if toolCall.status == .running {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .scaleEffect(0.65)
+                        } else {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 6, height: 6)
+                        }
                         Text(statusText)
                             .font(.caption2.weight(.medium))
                             .foregroundColor(statusColor)
