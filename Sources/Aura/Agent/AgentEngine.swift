@@ -86,20 +86,30 @@ public final class AgentEngine: @unchecked Sendable {
             allTools.append(createSkillTool(registry: activeSkillReg))
         }
 
-        // Hard-block unconfigured OpenAgentSDK base tools and disabled Aura tools
-        var disallowed = [
-            "WebFetch", "WebSearch", "Bash", "Read", "Write",
-            "Edit", "Glob", "Grep", "AskUser", "ToolSearch", "PauseForHuman"
-        ]
-        let (compOn, termOn, scriptOn) = await MainActor.run {
+        // Read configuration from CapabilityConfigManager
+        let (compOn, termOn, scriptOn, webOn, fsOn) = await MainActor.run {
             let cfg = CapabilityConfigManager.shared
-            return (cfg.isComputerEnabled, cfg.isTerminalEnabled, cfg.isMacScriptEnabled)
+            return (cfg.isComputerEnabled, cfg.isTerminalEnabled, cfg.isMacScriptEnabled, cfg.isWebEnabled, cfg.isFileSystemEnabled)
         }
+
+        // Only disallow tools that are specifically replaced (Bash -> terminal, AskUser -> GUI) or explicitly turned OFF by user
+        var disallowed: [String] = ["Bash", "AskUser", "ToolSearch", "PauseForHuman"]
         if !compOn { disallowed.append("computer") }
         if !termOn { disallowed.append("terminal") }
         if !scriptOn { disallowed.append("mac_script") }
+        if !webOn { disallowed.append(contentsOf: ["WebFetch", "WebSearch"]) }
+        if !fsOn { disallowed.append(contentsOf: ["Read", "Write", "Edit", "Glob", "Grep"]) }
 
-        let toolListSummary = allTools.map { $0.name }.joined(separator: ", ")
+        var activeToolNames = allTools.map { $0.name }
+        if webOn {
+            activeToolNames.append(contentsOf: ["WebFetch", "WebSearch"])
+        }
+        if fsOn {
+            activeToolNames.append(contentsOf: ["Read", "Write", "Edit", "Glob", "Grep"])
+        }
+        let mcpServerNames = mcpConfigs.keys.sorted()
+        let mcpSummary = mcpServerNames.isEmpty ? "none" : mcpServerNames.joined(separator: ", ")
+        let toolListSummary = activeToolNames.joined(separator: ", ")
         let skillListSummary = activeSkillReg.allSkills.map { $0.name }.joined(separator: ", ")
 
         let options = AgentOptions(
@@ -109,12 +119,13 @@ public final class AgentEngine: @unchecked Sendable {
             provider: provider,
             systemPrompt: """
             You are Aura, an intelligent macOS voice and desktop AI assistant.
-            Active native capabilities: [\(toolListSummary)].
+            Active native tools: [\(toolListSummary)].
             Active domain skills: [\(skillListSummary.isEmpty ? "none" : skillListSummary)].
+            Connected MCP connectors: [\(mcpSummary)].
 
             CORE RULES:
-            1. CONVERSATIONAL & CAPABILITY QUESTIONS: When the user asks about your capabilities, tools, or registered skills (e.g. "What skills do you have?"), answer directly and conversationally from your knowledge without invoking tools. Explicitly state your active tools and skills: [\(toolListSummary)] and skills: [\(skillListSummary)]. Do NOT use terminal or filesystem commands to search external app directories (such as Claude) for skills.
-            2. ACTION & INSPECTION REQUESTS: Only invoke tools when the user explicitly requests an action (such as opening an application, creating a note, clicking UI, running a script) or asks to inspect system files.
+            1. CONVERSATIONAL & CAPABILITY QUESTIONS: When the user asks about your capabilities, tools, connected MCP servers, or registered skills, answer directly and conversationally from your knowledge without running shell commands. You have native macOS automation (computer, terminal, mac_script), built-in web tools (WebFetch for fetching URLs and reading web pages, WebSearch for web search queries), built-in filesystem tools (Read, Write, Edit, Glob, Grep), connected MCP connectors ([\(mcpSummary)]), and domain skills ([\(skillListSummary)]). If the user asks about a connected tool (such as WebFetch or a connected MCP server like GitHub), explain that it is active and available.
+            2. ACTION & INSPECTION REQUESTS: Only invoke tools when the user explicitly requests an action (such as fetching a webpage, searching repositories, opening an application, creating a note, clicking UI, running a script) or asks to inspect system files.
             3. EVALUATING TOOL RESULTS & GROUNDING: Always inspect the latest tool result. If a tool succeeds or returns UI observation data / SUCCESS, the action SUCCEEDED and permissions ARE active. Confirm the success clearly to the user. Never claim an action failed if the tool succeeded. Do not be confused by prior conversation turns or by previous error messages visible inside observed window text.
             4. FAST-FAIL ON REAL ERRORS: Only if a tool actually returns an explicit error message regarding Accessibility, Assistive access, or Screen Recording, inform the user and point them to Aura's Permissions Hub in Settings. Do not retry 4-5 alternative tools in a loop.
             5. APP AUTOMATION: Prefer mac_script for scriptable apps (Notes, Music, Finder, Safari, Calendar). Never tunnel AppleScript through terminal. Apps without scripting dictionaries (like Clock) or web logins (like YouTube subscription) should not be forced with multiple blind AppleScript attempts; open the app or guide the user instead.

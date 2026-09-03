@@ -17,6 +17,12 @@ public final class CapabilityConfigManager: ObservableObject {
     @Published public var isMacScriptEnabled: Bool {
         didSet { UserDefaults.standard.set(isMacScriptEnabled, forKey: "cap_tool_mac_script_enabled") }
     }
+    @Published public var isWebEnabled: Bool {
+        didSet { UserDefaults.standard.set(isWebEnabled, forKey: "cap_web_tools_enabled") }
+    }
+    @Published public var isFileSystemEnabled: Bool {
+        didSet { UserDefaults.standard.set(isFileSystemEnabled, forKey: "cap_filesystem_tools_enabled") }
+    }
 
     // MARK: - Computer Sub-Action Permissions
     @Published public var allowObserve: Bool {
@@ -56,6 +62,8 @@ public final class CapabilityConfigManager: ObservableObject {
         self.isComputerEnabled = defaults.object(forKey: "cap_tool_computer_enabled") as? Bool ?? true
         self.isTerminalEnabled = defaults.object(forKey: "cap_tool_terminal_enabled") as? Bool ?? true
         self.isMacScriptEnabled = defaults.object(forKey: "cap_tool_mac_script_enabled") as? Bool ?? true
+        self.isWebEnabled = defaults.object(forKey: "cap_web_tools_enabled") as? Bool ?? true
+        self.isFileSystemEnabled = defaults.object(forKey: "cap_filesystem_tools_enabled") as? Bool ?? true
 
         // Computer sub-actions (default to true)
         self.allowObserve = defaults.object(forKey: "cap_computer_allow_observe") as? Bool ?? true
@@ -83,6 +91,8 @@ public final class CapabilityConfigManager: ObservableObject {
         case "computer": return isComputerEnabled
         case "terminal", "execute_terminal_command": return isTerminalEnabled
         case "mac_script": return isMacScriptEnabled
+        case "webfetch", "websearch": return isWebEnabled
+        case "read", "write", "edit", "glob", "grep": return isFileSystemEnabled
         default: return true
         }
     }
@@ -160,6 +170,8 @@ public final class CapabilityConfigManager: ObservableObject {
         if isComputerEnabled { count += 1 }
         if isTerminalEnabled { count += 1 }
         if isMacScriptEnabled { count += 1 }
+        if isWebEnabled { count += 1 }
+        if isFileSystemEnabled { count += 1 }
         return count
     }
 }

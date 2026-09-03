@@ -16,6 +16,8 @@ public struct ToolsSettingsView: View {
                 computerCard
                 terminalCard
                 macScriptCard
+                webCard
+                fileSystemCard
             }
         }
         .onAppear {
@@ -29,7 +31,7 @@ public struct ToolsSettingsView: View {
             HStack(spacing: 8) {
                 Text("Native Capabilities")
                     .font(.title3.weight(.bold))
-                Text("\(capabilityConfig.activeToolCount) of 3 Tools Active")
+                Text("\(capabilityConfig.activeToolCount) of 5 Capabilities Active")
                     .font(.caption2.weight(.semibold))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
@@ -37,7 +39,7 @@ public struct ToolsSettingsView: View {
                     .foregroundColor(.blue)
                     .cornerRadius(6)
             }
-            Text("Fine-grained control over Aura's three core macOS tools and permissible sub-actions.")
+            Text("Fine-grained control over Aura's macOS automation, web browsing, and workspace inspection capabilities.")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -268,6 +270,102 @@ public struct ToolsSettingsView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(capabilityConfig.isMacScriptEnabled ? Color.purple.opacity(0.2) : Color.primary.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    // MARK: - 4. Web & Search Tools Card
+    private var webCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                Image(systemName: "globe")
+                    .font(.title2)
+                    .foregroundColor(capabilityConfig.isWebEnabled ? .blue : .secondary)
+                    .frame(width: 36, height: 36)
+                    .background((capabilityConfig.isWebEnabled ? Color.blue : Color.secondary).opacity(0.12))
+                    .cornerRadius(8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("web_fetch & web_search")
+                            .font(.headline)
+                        Text("Online Browsing & API")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Text("Fetches web pages, parses HTML content to clean markdown, and queries online search engines.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $capabilityConfig.isWebEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+
+            if capabilityConfig.isWebEnabled {
+                HStack(spacing: 8) {
+                    Text("Includes: WebFetch (HTTP GET & JSON API) and WebSearch (DuckDuckGo search queries)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(capabilityConfig.isWebEnabled ? Color.blue.opacity(0.2) : Color.primary.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    // MARK: - 5. File System & Code Tools Card
+    private var fileSystemCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.title2)
+                    .foregroundColor(capabilityConfig.isFileSystemEnabled ? .indigo : .secondary)
+                    .frame(width: 36, height: 36)
+                    .background((capabilityConfig.isFileSystemEnabled ? Color.indigo : Color.secondary).opacity(0.12))
+                    .cornerRadius(8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("workspace_files")
+                            .font(.headline)
+                        Text("Read, Edit & Search")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Text("Inspects files, performs fast regex searches via ripgrep patterns, and applies precision edits to documents.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $capabilityConfig.isFileSystemEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+
+            if capabilityConfig.isFileSystemEnabled {
+                HStack(spacing: 8) {
+                    Text("Includes: Read, Write, Edit, Glob, and Grep tools")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(capabilityConfig.isFileSystemEnabled ? Color.indigo.opacity(0.2) : Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
 
