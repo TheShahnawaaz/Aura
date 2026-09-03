@@ -42,8 +42,16 @@ echo -n "APPL????" > "$CONTENTS/PkgInfo"
 
 # Ad-hoc sign bundle if codesign is available
 if command -v codesign &> /dev/null; then
-    echo "==> Signing application bundle..."
-    codesign --force --deep --sign - --entitlements Resources/Aura.entitlements "$APP_BUNDLE"
+    echo "==> Signing application bundle with stable designated requirement..."
+    codesign --force --deep --sign - -r='designated => identifier "com.aura.mac"' --entitlements Resources/Aura.entitlements "$APP_BUNDLE"
+fi
+
+# Also update /Applications/Aura.app if writable so macOS path stays consistent
+if [ -d "/Applications" ] && [ -w "/Applications" ]; then
+    echo "==> Updating /Applications/Aura.app..."
+    rm -rf "/Applications/Aura.app"
+    cp -R "$APP_BUNDLE" "/Applications/Aura.app"
+    xattr -cr "/Applications/Aura.app" 2>/dev/null || true
 fi
 
 echo "==> Successfully bundled Aura.app at $(pwd)/$APP_BUNDLE"

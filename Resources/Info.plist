@@ -34,5 +34,7 @@
     <string>Aura uses accessibility features to inspect context and automate user workflows.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>Aura uses Apple speech recognition to transcribe your spoken words into actions in real time.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Aura needs screen capture access to observe your screen and take screenshots on your command.</string>
 </dict>
 </plist>

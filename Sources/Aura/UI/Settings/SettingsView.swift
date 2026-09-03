@@ -61,6 +61,8 @@ public struct SettingsView: View {
                     ConnectorsSettingsView()
                 case .tools:
                     ToolsSettingsView()
+                case .permissions:
+                    PermissionsSettingsView()
                 case .appearance:
                     AppearanceSettingsView(appState: appState)
                 }

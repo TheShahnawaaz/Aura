@@ -9,6 +9,7 @@ public enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case shortcuts = "Shortcuts"
     case connectors = "Connectors"
     case tools = "Tools"
+    case permissions = "Permissions"
     case appearance = "Appearance"
 
     public var id: String { rawValue }
@@ -24,6 +25,7 @@ public enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .shortcuts: return "keyboard"
         case .connectors: return "point.3.connected.trianglepath.dotted"
         case .tools: return "wrench.and.screwdriver.fill"
+        case .permissions: return "lock.shield.fill"
         case .appearance: return "sparkles"
         }
     }
@@ -37,6 +39,7 @@ public enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .shortcuts: return .green
         case .connectors: return .cyan
         case .tools: return .blue
+        case .permissions: return .teal
         case .appearance: return .pink
         }
     }
