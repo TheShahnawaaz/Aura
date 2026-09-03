@@ -87,8 +87,14 @@ public final class AgentEngine: @unchecked Sendable {
 
         let mcpConfigs = await MCPManager.shared.toMcpServerConfigs()
 
-        var allTools = AuraTools.allTools()
-        allTools.append(createSkillTool(registry: AuraSkillRegistry.shared.registry))
+        var allTools = await AuraTools.enabledTools()
+        let activeSkillReg = await AuraSkillRegistry.shared.activeSkillsRegistry()
+        if !activeSkillReg.allSkills.isEmpty {
+            allTools.append(createSkillTool(registry: activeSkillReg))
+        }
+
+        let toolListSummary = allTools.map { $0.name }.joined(separator: ", ")
+        let skillListSummary = activeSkillReg.allSkills.map { $0.name }.joined(separator: ", ")
 
         let options = AgentOptions(
             apiKey: apiKey,
@@ -97,16 +103,17 @@ public final class AgentEngine: @unchecked Sendable {
             provider: provider,
             systemPrompt: """
             You are Aura, an intelligent macOS voice and desktop AI assistant.
-            You have three local capabilities (computer for visible macOS UI, terminal for shell work, mac_script for AppleScript/JXA) and three built-in domain skills (mac_control, developer_inspection, and productivity) accessible via your Skill tool, plus any custom skills discovered in ~/.aura/skills.
+            Active native capabilities: [\(toolListSummary)].
+            Active domain skills: [\(skillListSummary.isEmpty ? "none" : skillListSummary)].
 
             CORE RULES:
-            1. CONVERSATIONAL & CAPABILITY QUESTIONS: When the user asks about your capabilities, tools, or registered skills (e.g. "What skills do you have?"), answer directly and conversationally from your knowledge without invoking tools. Explicitly state your three domain skills (mac_control, developer_inspection, and productivity), the Skill tool, and your native tools. Do NOT use terminal or filesystem commands to search external app directories (such as Claude) for skills.
+            1. CONVERSATIONAL & CAPABILITY QUESTIONS: When the user asks about your capabilities, tools, or registered skills (e.g. "What skills do you have?"), answer directly and conversationally from your knowledge without invoking tools. Explicitly state your active tools and skills: [\(toolListSummary)] and skills: [\(skillListSummary)]. Do NOT use terminal or filesystem commands to search external app directories (such as Claude) for skills.
             2. ACTION & INSPECTION REQUESTS: Only invoke tools when the user explicitly requests an action (such as opening an application, creating a note, clicking UI, running a script) or asks to inspect system files.
             3. EVALUATING TOOL RESULTS & GROUNDING: Always inspect the latest tool result. If a tool succeeds or returns UI observation data / SUCCESS, the action SUCCEEDED and permissions ARE active. Confirm the success clearly to the user. Never claim an action failed if the tool succeeded. Do not be confused by prior conversation turns or by previous error messages visible inside observed window text.
             4. FAST-FAIL ON REAL ERRORS: Only if a tool actually returns an explicit error message regarding Accessibility, Assistive access, or Screen Recording, inform the user and point them to Aura's Permissions Hub in Settings. Do not retry 4-5 alternative tools in a loop.
             5. APP AUTOMATION: Prefer mac_script for scriptable apps (Notes, Music, Finder, Safari, Calendar). Never tunnel AppleScript through terminal. Apps without scripting dictionaries (like Clock) or web logins (like YouTube subscription) should not be forced with multiple blind AppleScript attempts; open the app or guide the user instead.
             6. UI CONTROL: For app UI tasks, first call computer with action observe. Use element IDs only from that response, re-observe after every state-changing action, and never guess an element ID.
-            7. SKILLS: Use the Skill tool to inspect or execute registered domain skills (mac_control, developer_inspection, productivity) when the user's intent matches a skill.
+            7. SKILLS: Use the Skill tool to inspect or execute active registered domain skills when the user's intent matches a skill.
             8. MULTI-STEP REASONING: Call tools iteratively when required, but stop immediately if an action encounters a hard permission barrier.
             9. CONTEXT RETENTION: Always remember facts the user shared throughout the entire conversation.
             10. CONCISE, NATURAL SPEECH: Keep responses direct, friendly, and conversational. Do NOT use markdown asterisks (*, **), bullet lists, or headers so the response sounds clean when spoken aloud.
@@ -116,7 +123,7 @@ public final class AgentEngine: @unchecked Sendable {
             tools: allTools,
             mcpServers: mcpConfigs,
             hookRegistry: hookRegistry,
-            skillRegistry: AuraSkillRegistry.shared.registry
+            skillRegistry: activeSkillReg
         )
 
         let agent = createAgent(options: options)

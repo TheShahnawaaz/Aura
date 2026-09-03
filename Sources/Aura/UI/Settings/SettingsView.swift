@@ -57,10 +57,8 @@ public struct SettingsView: View {
                     VoiceAudioSettingsView(appState: appState)
                 case .shortcuts:
                     ShortcutsSettingsView(appState: appState)
-                case .connectors:
-                    ConnectorsSettingsView()
-                case .tools:
-                    ToolsSettingsView()
+                case .capabilities:
+                    CapabilitiesSettingsView()
                 case .permissions:
                     PermissionsSettingsView()
                 case .appearance:

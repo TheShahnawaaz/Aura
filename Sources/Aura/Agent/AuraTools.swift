@@ -26,6 +26,16 @@ public struct MacScriptInput: Codable, Sendable {
 public enum AuraTools {
     public static func allTools() -> [ToolProtocol] { [computerTool, terminalTool, macScriptTool] }
 
+    @MainActor
+    public static func enabledTools() -> [ToolProtocol] {
+        var tools: [ToolProtocol] = []
+        let config = CapabilityConfigManager.shared
+        if config.isComputerEnabled { tools.append(computerTool) }
+        if config.isTerminalEnabled { tools.append(terminalTool) }
+        if config.isMacScriptEnabled { tools.append(macScriptTool) }
+        return tools
+    }
+
     public static let computerTool: ToolProtocol = defineTool(
         name: "computer",
         description: "Controls the visible macOS UI. First call observe, then use only element_id values from that exact observation. Re-observe after every UI-changing action. Never invent element IDs.",
@@ -44,6 +54,11 @@ public enum AuraTools {
         ],
         isReadOnly: false
     ) { (input: ComputerInput, _: ToolContext) async throws -> String in
+        let check = await CapabilityConfigManager.shared.isSubActionAllowed(tool: "computer", action: input.action)
+        if !check.allowed {
+            throw AuraToolError.actionDisabled(check.reason ?? "Action is disabled in Capabilities Settings.")
+        }
+
         switch input.action.lowercased() {
         case "observe":
             let json = try ComputerControlService.shared.observe(appBundleId: input.app_bundle_id)
@@ -70,8 +85,14 @@ public enum AuraTools {
                 "cwd": ["type": "string", "description": "Optional existing working directory"]
             ],
             "required": ["command"]
-        ]
+        ],
+        isReadOnly: false
     ) { (input: TerminalInput, _: ToolContext) async throws -> String in
+        let check = await CapabilityConfigManager.shared.isSubActionAllowed(tool: "terminal", action: "execute")
+        if !check.allowed {
+            throw AuraToolError.actionDisabled(check.reason ?? "Terminal execution is disabled in Capabilities Settings.")
+        }
+
         let safety = GuardrailsEngine.shared.evaluateTool(name: "terminal", input: ["command": input.command])
         if case .requiresConfirmation(let request) = safety {
             let approved = await ApprovalCoordinator.shared.requestApproval(request: request)
@@ -95,6 +116,11 @@ public enum AuraTools {
             "required": ["language", "source"]
         ]
     ) { (input: MacScriptInput, _: ToolContext) async throws -> String in
+        let check = await CapabilityConfigManager.shared.isSubActionAllowed(tool: "mac_script", action: input.language)
+        if !check.allowed {
+            throw AuraToolError.actionDisabled(check.reason ?? "Language \(input.language) is disabled in Capabilities Settings.")
+        }
+
         let safety = GuardrailsEngine.shared.evaluateTool(name: "mac_script", input: ["source": input.source])
         if case .requiresConfirmation(let request) = safety {
             let approved = await ApprovalCoordinator.shared.requestApproval(request: request)
@@ -113,6 +139,7 @@ public enum AuraToolError: LocalizedError {
     case invalidAction(String)
     case missingArgument(String)
     case actionDenied(String)
+    case actionDisabled(String)
     case confirmationRequired(ActionConfirmationRequest)
 
     public var errorDescription: String? {
@@ -120,6 +147,7 @@ public enum AuraToolError: LocalizedError {
         case .invalidAction(let action): return "Unsupported computer action: \(action)."
         case .missingArgument(let name): return "Missing required argument: \(name)."
         case .actionDenied(let reason): return reason
+        case .actionDisabled(let reason): return "Disabled: \(reason)"
         case .confirmationRequired(let request): return "Confirmation required: \(request.title). \(request.description)"
         }
     }

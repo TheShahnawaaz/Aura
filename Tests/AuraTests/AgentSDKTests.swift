@@ -100,6 +100,38 @@ final class AgentSDKTests: XCTestCase {
     func testAuraSkillRegistryDomainSkills() {
         let registry = AuraSkillRegistry.shared.registry
         XCTAssertNotNil(registry)
+        XCTAssertGreaterThanOrEqual(registry.allSkills.count, 3)
+    }
+
+    func testCapabilityConfigManagerAndFiltering() async {
+        let config = await CapabilityConfigManager.shared
+        await MainActor.run {
+            config.setSkillEnabled("productivity", isEnabled: false)
+        }
+        let activeSkills = await AuraSkillRegistry.shared.activeSkillsRegistry()
+        let activeNames = activeSkills.allSkills.map { $0.name }
+        XCTAssertFalse(activeNames.contains("productivity"), "Disabled skill should be excluded from activeSkillsRegistry")
+
+        await MainActor.run {
+            config.setSkillEnabled("productivity", isEnabled: true)
+        }
+        let restoredSkills = await AuraSkillRegistry.shared.activeSkillsRegistry()
+        let restoredNames = restoredSkills.allSkills.map { $0.name }
+        XCTAssertTrue(restoredNames.contains("productivity"), "Re-enabled skill should be present in activeSkillsRegistry")
+
+        // Test sub-action gating
+        let allowed = await config.isSubActionAllowed(tool: "computer", action: "observe")
+        XCTAssertTrue(allowed.allowed)
+
+        await MainActor.run {
+            config.allowObserve = false
+        }
+        let denied = await config.isSubActionAllowed(tool: "computer", action: "observe")
+        XCTAssertFalse(denied.allowed)
+
+        await MainActor.run {
+            config.allowObserve = true
+        }
     }
 
     func testMcpServerConfigBridging() async {

@@ -65,6 +65,57 @@ public final class AuraSkillRegistry: @unchecked Sendable {
         }
     }
 
+    /// Returns an active SkillRegistry containing only skills enabled in CapabilityConfigManager.
+    @MainActor
+    public func activeSkillsRegistry() -> SkillRegistry {
+        let activeReg = SkillRegistry()
+        for skill in registry.allSkills {
+            if CapabilityConfigManager.shared.isSkillEnabled(skill.name) {
+                activeReg.register(skill)
+            }
+        }
+        return activeReg
+    }
+
+    /// Reloads all skills: re-registers domain skills and re-scans filesystem directories.
+    public func reloadSkills() {
+        // Re-discover external skills
+        discoverExternalSkills()
+    }
+
+    /// Ensures the ~/.aura/skills folder exists on disk and returns its path.
+    @discardableResult
+    public func ensureSkillsFolderExists() -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let skillsDir = "\(home)/.aura/skills"
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: skillsDir) {
+            try? fm.createDirectory(atPath: skillsDir, withIntermediateDirectories: true)
+            // Drop a sample README explaining how to add custom skills
+            let readme = """
+            # Aura Custom Skills Directory
+
+            Drop your custom skill folders here! Each skill should be a subfolder containing a `SKILL.md` file.
+
+            Example structure:
+            ~/.aura/skills/
+              └── my_custom_skill/
+                  └── SKILL.md
+
+            Example SKILL.md frontmatter:
+            ---
+            name: my_custom_skill
+            description: Description of what this skill does
+            user_invocable: true
+            ---
+            Your skill instructions and prompt template go here.
+            """
+            let readmePath = "\(skillsDir)/README.md"
+            try? readme.write(toFile: readmePath, atomically: true, encoding: .utf8)
+        }
+        return skillsDir
+    }
+
     /// Returns a list of all registered skill names and descriptions.
     public func registeredSkillSummaries() -> [(name: String, description: String)] {
         registry.allSkills.map { ($0.name, $0.description) }
