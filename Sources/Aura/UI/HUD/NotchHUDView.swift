@@ -41,7 +41,7 @@ public struct NotchHUDView: View {
         if isExpanded {
             if (isHovering || appState.isTurnCompletedPresented) && appState.state == .idle {
                 if inspectorContentHeight > 0 {
-                    return min(800, geometry.notchHeight + inspectorContentHeight + 56)
+                    return min(600, geometry.notchHeight + inspectorContentHeight + 46)
                 }
                 let session = currentSelectedSession
                 let hasTools = session?.messages.last?.toolCalls.isEmpty == false
@@ -492,67 +492,64 @@ public struct NotchHUDView: View {
             if let session, !session.messages.isEmpty {
                 let lastUserMsg = session.messages.last(where: { $0.role == .user })
                 let lastAssistantMsg = session.messages.last(where: { $0.role == .assistant })
-                ScrollView(.vertical, showsIndicators: true) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if let userMsg = lastUserMsg {
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: 4) {
-                                    if userMsg.isVoice {
-                                        Image(systemName: "mic.fill")
-                                            .font(.system(size: 8))
-                                            .foregroundColor(.blue)
-                                    }
-                                    Text("YOU")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(.white.opacity(0.5))
-                                }
-                                Text(userMsg.content)
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.95))
-                                    .textSelection(.enabled)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-
-                        // Full Tool Call UI in Notch
-                        if let assistantMsg = lastAssistantMsg, !assistantMsg.toolCalls.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("TOOLS EXECUTED")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundColor(.purple.opacity(0.8))
-
-                                ForEach(assistantMsg.toolCalls) { toolCall in
-                                    ToolCallCardView(toolCall: toolCall)
-                                }
-                            }
-                        }
-
-                        if let assistantMsg = lastAssistantMsg, !assistantMsg.content.isEmpty {
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "sparkles")
+                VStack(alignment: .leading, spacing: 10) {
+                    if let userMsg = lastUserMsg {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 4) {
+                                if userMsg.isVoice {
+                                    Image(systemName: "mic.fill")
                                         .font(.system(size: 8))
-                                        .foregroundColor(.purple)
-                                    Text("AURA")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(.purple.opacity(0.8))
+                                        .foregroundColor(.blue)
                                 }
-                                Text(assistantMsg.content)
-                                    .font(.system(size: 12, weight: .regular))
-                                    .foregroundColor(.white.opacity(0.9))
-                                    .textSelection(.enabled)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                Text("YOU")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                            Text(userMsg.content)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.95))
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    // Full Tool Call UI in Notch
+                    if let assistantMsg = lastAssistantMsg, !assistantMsg.toolCalls.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("TOOLS EXECUTED")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundColor(.purple.opacity(0.8))
+
+                            ForEach(assistantMsg.toolCalls) { toolCall in
+                                ToolCallCardView(toolCall: toolCall)
                             }
                         }
                     }
-                    .padding(.trailing, 4)
-                    .background(
-                        GeometryReader { geo in
-                            Color.clear.preference(key: ContentHeightPreferenceKey.self, value: geo.size.height)
+
+                    if let assistantMsg = lastAssistantMsg, !assistantMsg.content.isEmpty {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.purple)
+                                Text("AURA")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.purple.opacity(0.8))
+                            }
+                            Text(assistantMsg.content)
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundColor(.white.opacity(0.9))
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                    )
+                    }
                 }
-                .frame(maxHeight: 460)
+                .padding(.trailing, 2)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: ContentHeightPreferenceKey.self, value: geo.size.height)
+                    }
+                )
             } else {
                 // Clean new chat ready state
                 VStack(alignment: .center, spacing: 6) {
