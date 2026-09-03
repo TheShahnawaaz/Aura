@@ -73,10 +73,10 @@ final class AgentSDKTests: XCTestCase {
 
     func testOpenAgentSDKNativeTools() {
         let tools = AuraTools.allTools()
-        XCTAssertEqual(tools.count, 3, "AuraTools should register three generic native tools")
+        XCTAssertEqual(tools.count, 4, "AuraTools should register four native tools (computer, terminal, mac_script, view_image)")
 
         let toolNames = tools.map { $0.name }
-        XCTAssertEqual(Set(toolNames), ["computer", "terminal", "mac_script"])
+        XCTAssertEqual(Set(toolNames), ["computer", "terminal", "mac_script", "view_image"])
     }
 
     func testControlPolicyRequiresApprovalForMutation() {
@@ -184,4 +184,74 @@ final class AgentSDKTests: XCTestCase {
         XCTAssertTrue(fallbacks.contains(where: { $0.modelId == "gemini-2.5-flash" }))
     }
 
+    @MainActor
+    func testCapabilityConfigManagerVision() {
+        let mgr = CapabilityConfigManager.shared
+        mgr.isVisionEnabled = true
+        XCTAssertTrue(mgr.isToolEnabled("view_image"))
+        XCTAssertTrue(mgr.isToolEnabled("vision"))
+
+        mgr.isVisionEnabled = false
+        XCTAssertFalse(mgr.isToolEnabled("view_image"))
+        XCTAssertFalse(mgr.isToolEnabled("vision"))
+
+        // Reset
+        mgr.isVisionEnabled = true
+    }
+
+    func testViewImageToolExecution() async throws {
+        // Create a temporary 120x80 test PNG image
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: nil,
+            width: 120,
+            height: 80,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            XCTFail("Failed to create CGContext")
+            return
+        }
+        ctx.setFillColor(red: 0.2, green: 0.6, blue: 0.9, alpha: 1.0)
+        ctx.fill(CGRect(x: 0, y: 0, width: 120, height: 80))
+        guard let image = ctx.makeImage() else {
+            XCTFail("Failed to make CGImage")
+            return
+        }
+
+        let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent("aura-test-image-\(UUID().uuidString).png")
+        guard let dest = CGImageDestinationCreateWithURL(tempUrl as CFURL, "public.png" as CFString, 1, nil) else {
+            XCTFail("Failed to create destination")
+            return
+        }
+        CGImageDestinationAddImage(dest, image, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(dest))
+
+        defer {
+            try? FileManager.default.removeItem(at: tempUrl)
+        }
+
+        // Execute view_image tool
+        let tool = AuraTools.viewImageTool
+        let context = ToolContext(
+            cwd: FileManager.default.currentDirectoryPath,
+            toolUseId: "test-tool-call",
+            agentId: "test-agent",
+            sessionId: "test-session"
+        )
+        let result = await tool.call(input: ["file_path": tempUrl.path], context: context)
+        XCTAssertFalse(result.isError)
+        XCTAssertNotNil(result.typedContent)
+
+        // Check typed content contains .image
+        let hasImage = result.typedContent?.contains(where: { item in
+            if case .image(let data, let mime) = item {
+                return !data.isEmpty && mime == "image/jpeg"
+            }
+            return false
+        }) ?? false
+        XCTAssertTrue(hasImage, "view_image should return typed image content block")
+    }
 }

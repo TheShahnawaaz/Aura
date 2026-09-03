@@ -92,22 +92,98 @@ public final class ComputerControlService: @unchecked Sendable {
         return "Scrolled \(direction). Re-observe before the next UI action."
     }
 
-    public func takeScreenshot() throws -> String {
+    public struct CapturedImage: Sendable {
+        public let data: Data
+        public let mimeType: String
+        public let path: String
+        public let width: Int
+        public let height: Int
+    }
+
+    public func captureScreenshotData() throws -> CapturedImage {
         if !CGPreflightScreenCaptureAccess() {
             _ = CGRequestScreenCaptureAccess()
         }
         guard let image = CGDisplayCreateImage(CGMainDisplayID()) else {
             throw ComputerControlError.screenshotFailed
         }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("AuraScreenshots", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent("Aura-\(UUID().uuidString).png")
-        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+
+        let originalWidth = image.width
+        let originalHeight = image.height
+        let maxDimension = 1568
+        let targetWidth: Int
+        let targetHeight: Int
+        if originalWidth > maxDimension || originalHeight > maxDimension {
+            if originalWidth > originalHeight {
+                targetWidth = maxDimension
+                targetHeight = max(1, Int(Double(originalHeight) * Double(maxDimension) / Double(originalWidth)))
+            } else {
+                targetHeight = maxDimension
+                targetWidth = max(1, Int(Double(originalWidth) * Double(maxDimension) / Double(originalHeight)))
+            }
+        } else {
+            targetWidth = originalWidth
+            targetHeight = originalHeight
+        }
+
+        let processedImage: CGImage
+        if targetWidth != originalWidth || targetHeight != originalHeight {
+            let colorSpace = CGColorSpaceCreateDeviceRGB()
+            let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+            guard let context = CGContext(
+                data: nil,
+                width: targetWidth,
+                height: targetHeight,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: colorSpace,
+                bitmapInfo: bitmapInfo
+            ) else {
+                throw ComputerControlError.screenshotFailed
+            }
+            context.interpolationQuality = .high
+            context.draw(image, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+            guard let scaled = context.makeImage() else {
+                throw ComputerControlError.screenshotFailed
+            }
+            processedImage = scaled
+        } else {
+            processedImage = image
+        }
+
+        // Encode as JPEG (82% quality) for optimal LLM token density and speed
+        let mutableData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(mutableData as CFMutableData, "public.jpeg" as CFString, 1, nil) else {
             throw ComputerControlError.screenshotFailed
         }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else { throw ComputerControlError.screenshotFailed }
-        return "Screenshot saved to \(url.path)"
+        let options: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: 0.82
+        ]
+        CGImageDestinationAddImage(destination, processedImage, options as CFDictionary)
+        guard CGImageDestinationFinalize(destination) else {
+            throw ComputerControlError.screenshotFailed
+        }
+        let data = mutableData as Data
+
+        // Persist to Aura Screenshots folder
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+        let screenshotsDir = appSupport.appendingPathComponent("Aura/Screenshots", isDirectory: true)
+        try? FileManager.default.createDirectory(at: screenshotsDir, withIntermediateDirectories: true)
+        let fileUrl = screenshotsDir.appendingPathComponent("Aura-Screenshot-\(UUID().uuidString).jpg")
+        try? data.write(to: fileUrl)
+
+        return CapturedImage(
+            data: data,
+            mimeType: "image/jpeg",
+            path: fileUrl.path,
+            width: targetWidth,
+            height: targetHeight
+        )
+    }
+
+    public func takeScreenshot() throws -> String {
+        let captured = try captureScreenshotData()
+        return "Screenshot saved to \(captured.path)"
     }
 
     private func resolveApplication(bundleId: String?) throws -> NSRunningApplication {

@@ -87,9 +87,9 @@ public final class AgentEngine: @unchecked Sendable {
         }
 
         // Read configuration from CapabilityConfigManager
-        let (compOn, termOn, scriptOn, webOn, fsOn) = await MainActor.run {
+        let (compOn, termOn, scriptOn, webOn, fsOn, visionOn) = await MainActor.run {
             let cfg = CapabilityConfigManager.shared
-            return (cfg.isComputerEnabled, cfg.isTerminalEnabled, cfg.isMacScriptEnabled, cfg.isWebEnabled, cfg.isFileSystemEnabled)
+            return (cfg.isComputerEnabled, cfg.isTerminalEnabled, cfg.isMacScriptEnabled, cfg.isWebEnabled, cfg.isFileSystemEnabled, cfg.isVisionEnabled)
         }
 
         // Only disallow tools that are specifically replaced (Bash -> terminal, AskUser -> GUI) or explicitly turned OFF by user
@@ -99,6 +99,7 @@ public final class AgentEngine: @unchecked Sendable {
         if !scriptOn { disallowed.append("mac_script") }
         if !webOn { disallowed.append(contentsOf: ["WebFetch", "WebSearch"]) }
         if !fsOn { disallowed.append(contentsOf: ["Read", "Write", "Edit", "Glob", "Grep"]) }
+        if !visionOn { disallowed.append("view_image") }
 
         var activeToolNames = allTools.map { $0.name }
         if webOn {
@@ -118,13 +119,13 @@ public final class AgentEngine: @unchecked Sendable {
             baseURL: baseURL,
             provider: provider,
             systemPrompt: """
-            You are Aura, an intelligent macOS voice and desktop AI assistant.
+            You are Aura, an intelligent macOS voice and desktop AI assistant with full multimodal vision.
             Active native tools: [\(toolListSummary)].
             Active domain skills: [\(skillListSummary.isEmpty ? "none" : skillListSummary)].
             Connected MCP connectors: [\(mcpSummary)].
 
             CORE RULES:
-            1. CONVERSATIONAL & CAPABILITY QUESTIONS: When the user asks about your capabilities, tools, connected MCP servers, or registered skills, answer directly and conversationally from your knowledge without running shell commands. You have native macOS automation (computer, terminal, mac_script), built-in web tools (WebFetch for fetching URLs and reading web pages, WebSearch for web search queries), built-in filesystem tools (Read, Write, Edit, Glob, Grep), connected MCP connectors ([\(mcpSummary)]), and domain skills ([\(skillListSummary)]). If the user asks about a connected tool (such as WebFetch or a connected MCP server like GitHub), explain that it is active and available.
+            1. CONVERSATIONAL & CAPABILITY QUESTIONS: When the user asks about your capabilities, tools, connected MCP servers, or registered skills, answer directly and conversationally from your knowledge without running shell commands. You have native macOS automation (computer, terminal, mac_script), native multimodal vision capabilities (computer with screenshot action to view the screen, and view_image to inspect images on disk), built-in web tools (WebFetch for fetching URLs and reading web pages, WebSearch for web search queries), built-in filesystem tools (Read, Write, Edit, Glob, Grep), connected MCP connectors ([\(mcpSummary)]), and domain skills ([\(skillListSummary)]). If the user asks about an active capability or tool, explain that it is active and available.
             2. ACTION & INSPECTION REQUESTS: Only invoke tools when the user explicitly requests an action (such as fetching a webpage, searching repositories, opening an application, creating a note, clicking UI, running a script) or asks to inspect system files.
             3. EVALUATING TOOL RESULTS & GROUNDING: Always inspect the latest tool result. If a tool succeeds or returns UI observation data / SUCCESS, the action SUCCEEDED and permissions ARE active. Confirm the success clearly to the user. Never claim an action failed if the tool succeeded. Do not be confused by prior conversation turns or by previous error messages visible inside observed window text.
             4. FAST-FAIL ON REAL ERRORS: Only if a tool actually returns an explicit error message regarding Accessibility, Assistive access, or Screen Recording, inform the user and point them to Aura's Permissions Hub in Settings. Do not retry 4-5 alternative tools in a loop.
@@ -134,6 +135,7 @@ public final class AgentEngine: @unchecked Sendable {
             8. MULTI-STEP REASONING: Call tools iteratively when required, but stop immediately if an action encounters a hard permission barrier.
             9. CONTEXT RETENTION: Always remember facts the user shared throughout the entire conversation.
             10. CONCISE, NATURAL SPEECH: Keep responses direct, friendly, and conversational. Do NOT use markdown asterisks (*, **), bullet lists, or headers so the response sounds clean when spoken aloud.
+            11. VISION & IMAGE UNDERSTANDING: You have full multimodal visual capabilities. When you invoke computer with action screenshot, full visual pixels of the screen are attached directly to your context. Examine the screenshot to read visible UI, OCR text, identify windows, or detect errors. To inspect any image on disk (photos, UI mockups, diagrams, screenshots), invoke view_image(file_path: ...). Never claim you cannot read or see images; you have vision tools.
             """,
             maxTurns: 10,
             permissionMode: .bypassPermissions,
@@ -207,19 +209,56 @@ actor ToolExecutionTracker {
         let started = startTimes[id] ?? CFAbsoluteTimeGetCurrent()
         let elapsed = max(Int((CFAbsoluteTimeGetCurrent() - started) * 1000), 1)
 
+        func detectImagePath(name: String, args: String, out: String) -> String? {
+            // 1. If output contains "Saved to /path/to/img.jpg" or "Screenshot saved to /..."
+            if let range = out.range(of: #"(?:Saved to |screenshot saved to )([^\s\n]+\.(?:png|jpg|jpeg|webp|bmp|heic))"#, options: [.regularExpression, .caseInsensitive]) {
+                let match = String(out[range])
+                if let colonRange = match.range(of: #"/.*"#, options: .regularExpression) {
+                    let path = String(match[colonRange]).trimmingCharacters(in: CharacterSet(charactersIn: " .,"))
+                    if FileManager.default.fileExists(atPath: path) {
+                        return path
+                    }
+                }
+            }
+            // 2. If view_image tool, extract file_path from arguments
+            if name.lowercased() == "view_image" {
+                if let range = args.range(of: #""file_path"\s*:\s*"([^"]+)""#, options: .regularExpression) {
+                    let full = String(args[range])
+                    let components = full.components(separatedBy: "\"")
+                    if components.count >= 4 {
+                        let path = (components[3] as NSString).expandingTildeInPath
+                        if FileManager.default.fileExists(atPath: path) {
+                            return path
+                        }
+                    }
+                }
+            }
+            // 3. Fallback: Check if output itself has an absolute image file path
+            if let range = out.range(of: #"(/Users/[^\s\n]+\.(?:png|jpg|jpeg|webp|bmp|heic))"#, options: [.regularExpression, .caseInsensitive]) {
+                let path = String(out[range]).trimmingCharacters(in: CharacterSet(charactersIn: " .,"))
+                if FileManager.default.fileExists(atPath: path) {
+                    return path
+                }
+            }
+            return nil
+        }
+
         if let idx = records.firstIndex(where: { $0.id == id || ($0.toolName == toolName && $0.status == .running) }) {
             records[idx].output = output
             records[idx].status = status
             records[idx].latencyMs = elapsed
+            records[idx].imagePath = detectImagePath(name: toolName, args: records[idx].argumentsJson, out: output)
             return records[idx]
         } else {
+            let img = detectImagePath(name: toolName, args: "", out: output)
             let rec = ToolCallRecord(
                 id: id,
                 toolName: toolName,
                 argumentsJson: "",
                 output: output,
                 status: status,
-                latencyMs: elapsed
+                latencyMs: elapsed,
+                imagePath: img
             )
             records.append(rec)
             return rec

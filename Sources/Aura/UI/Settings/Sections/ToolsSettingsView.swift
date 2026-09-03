@@ -18,6 +18,7 @@ public struct ToolsSettingsView: View {
                 macScriptCard
                 webCard
                 fileSystemCard
+                visionCard
             }
         }
         .onAppear {
@@ -31,7 +32,7 @@ public struct ToolsSettingsView: View {
             HStack(spacing: 8) {
                 Text("Native Capabilities")
                     .font(.title3.weight(.bold))
-                Text("\(capabilityConfig.activeToolCount) of 5 Capabilities Active")
+                Text("\(capabilityConfig.activeToolCount) of 6 Capabilities Active")
                     .font(.caption2.weight(.semibold))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
@@ -366,6 +367,54 @@ public struct ToolsSettingsView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(capabilityConfig.isFileSystemEnabled ? Color.indigo.opacity(0.2) : Color.primary.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    // MARK: - 6. Multimodal Vision & Image Inspection Card
+    private var visionCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                Image(systemName: "eye.fill")
+                    .font(.title2)
+                    .foregroundColor(capabilityConfig.isVisionEnabled ? .teal : .secondary)
+                    .frame(width: 36, height: 36)
+                    .background((capabilityConfig.isVisionEnabled ? Color.teal : Color.secondary).opacity(0.12))
+                    .cornerRadius(8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("view_image & vision")
+                            .font(.headline)
+                        Text("Multimodal Image Understanding")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Text("Enables visual multimodal understanding. Allows Aura to inspect images on disk (PNG, JPEG, WebP) and see screen pixels directly during screenshots.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $capabilityConfig.isVisionEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+
+            if capabilityConfig.isVisionEnabled {
+                HStack(spacing: 8) {
+                    Text("Includes: view_image (local file visual inspection) and computer(screenshot) visual pixel streaming")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(capabilityConfig.isVisionEnabled ? Color.teal.opacity(0.2) : Color.primary.opacity(0.06), lineWidth: 1)
         )
     }
 

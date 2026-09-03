@@ -556,6 +556,42 @@ public struct ToolCallCardView: View {
                                 .buttonStyle(.plain)
                             }
 
+                            // Inline Image Preview (for screenshots or image inspections)
+                            if let imgPath = toolCall.imagePath,
+                               let nsImage = NSImage(contentsOfFile: imgPath) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Image(nsImage: nsImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(maxHeight: 180)
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.12), radius: 3, y: 1)
+
+                                    HStack(spacing: 8) {
+                                        Button {
+                                            NSWorkspace.shared.open(URL(fileURLWithPath: imgPath))
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "arrow.up.right.square")
+                                                Text("Open in Preview")
+                                            }
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundColor(.blue)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        Text("• \(Int(nsImage.size.width)) × \(Int(nsImage.size.height)) px")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+
                             if isLongOutput {
                                 ScrollView(.vertical, showsIndicators: true) {
                                     Text(toolCall.output)
@@ -623,6 +659,7 @@ public struct ToolCallCardView: View {
         case "open_application": return "app.badge.fill"
         case "adjust_volume": return "speaker.wave.2.fill"
         case "take_screenshot": return "camera.fill"
+        case "view_image": return "photo.fill"
         case "list_files": return "folder.fill"
         case "execute_terminal_command": return "terminal.fill"
         case "search_emails": return "envelope.fill"

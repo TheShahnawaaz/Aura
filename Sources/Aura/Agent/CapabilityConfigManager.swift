@@ -23,6 +23,9 @@ public final class CapabilityConfigManager: ObservableObject {
     @Published public var isFileSystemEnabled: Bool {
         didSet { UserDefaults.standard.set(isFileSystemEnabled, forKey: "cap_filesystem_tools_enabled") }
     }
+    @Published public var isVisionEnabled: Bool {
+        didSet { UserDefaults.standard.set(isVisionEnabled, forKey: "cap_vision_tools_enabled") }
+    }
 
     // MARK: - Computer Sub-Action Permissions
     @Published public var allowObserve: Bool {
@@ -64,6 +67,7 @@ public final class CapabilityConfigManager: ObservableObject {
         self.isMacScriptEnabled = defaults.object(forKey: "cap_tool_mac_script_enabled") as? Bool ?? true
         self.isWebEnabled = defaults.object(forKey: "cap_web_tools_enabled") as? Bool ?? true
         self.isFileSystemEnabled = defaults.object(forKey: "cap_filesystem_tools_enabled") as? Bool ?? true
+        self.isVisionEnabled = defaults.object(forKey: "cap_vision_tools_enabled") as? Bool ?? true
 
         // Computer sub-actions (default to true)
         self.allowObserve = defaults.object(forKey: "cap_computer_allow_observe") as? Bool ?? true
@@ -93,6 +97,7 @@ public final class CapabilityConfigManager: ObservableObject {
         case "mac_script": return isMacScriptEnabled
         case "webfetch", "websearch": return isWebEnabled
         case "read", "write", "edit", "glob", "grep": return isFileSystemEnabled
+        case "view_image", "vision": return isVisionEnabled
         default: return true
         }
     }
@@ -172,6 +177,7 @@ public final class CapabilityConfigManager: ObservableObject {
         if isMacScriptEnabled { count += 1 }
         if isWebEnabled { count += 1 }
         if isFileSystemEnabled { count += 1 }
+        if isVisionEnabled { count += 1 }
         return count
     }
 }

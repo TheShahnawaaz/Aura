@@ -42,6 +42,7 @@ public struct ToolCallRecord: Identifiable, Codable, Equatable, Sendable {
     public var status: Status
     public var latencyMs: Int
     public var isExpanded: Bool
+    public var imagePath: String?
 
     public enum Status: String, Codable, Sendable {
         case running
@@ -56,7 +57,8 @@ public struct ToolCallRecord: Identifiable, Codable, Equatable, Sendable {
         output: String = "",
         status: Status = .running,
         latencyMs: Int = 0,
-        isExpanded: Bool = false
+        isExpanded: Bool = false,
+        imagePath: String? = nil
     ) {
         self.id = id
         self.toolName = toolName
@@ -65,6 +67,7 @@ public struct ToolCallRecord: Identifiable, Codable, Equatable, Sendable {
         self.status = status
         self.latencyMs = latencyMs
         self.isExpanded = isExpanded
+        self.imagePath = imagePath
     }
 }
 
