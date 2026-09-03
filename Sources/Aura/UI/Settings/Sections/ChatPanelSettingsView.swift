@@ -536,6 +536,11 @@ public struct ToolCallCardView: View {
                                 Text("TOOL OUTPUT")
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(.secondary)
+                                if isLongOutput {
+                                    Text("(\(toolCall.output.components(separatedBy: "\n").count) lines)")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.secondary.opacity(0.8))
+                                }
                                 Spacer()
                                 Button {
                                     NSPasteboard.general.clearContents()
@@ -551,15 +556,34 @@ public struct ToolCallCardView: View {
                                 .buttonStyle(.plain)
                             }
 
-                            Text(toolCall.output)
-                                .font(.system(size: 11, design: .monospaced))
-                                .lineLimit(nil)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .textSelection(.enabled)
-                                .padding(6)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            if isLongOutput {
+                                ScrollView(.vertical, showsIndicators: true) {
+                                    Text(toolCall.output)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .lineLimit(nil)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .textSelection(.enabled)
+                                        .padding(6)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .frame(height: 160)
                                 .background(Color.primary.opacity(0.05))
                                 .cornerRadius(4)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                                )
+                            } else {
+                                Text(toolCall.output)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .textSelection(.enabled)
+                                    .padding(6)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.primary.opacity(0.05))
+                                    .cornerRadius(4)
+                            }
                         }
                     }
                 }
@@ -572,6 +596,10 @@ public struct ToolCallCardView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
+    }
+
+    private var isLongOutput: Bool {
+        toolCall.output.count > 160 || toolCall.output.components(separatedBy: "\n").count > 4
     }
 
     private var statusColor: Color {
@@ -655,29 +683,71 @@ public struct ParsedArgumentsView: View {
                             Spacer()
                         }
 
-                        Text(entry.displayValue)
-                            .font(.system(size: 11, design: .monospaced))
-                            .lineLimit(nil)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .textSelection(.enabled)
-                            .padding(6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if isLongText(entry.displayValue) {
+                            ScrollView(.vertical, showsIndicators: true) {
+                                Text(entry.displayValue)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .textSelection(.enabled)
+                                    .padding(6)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(height: 120)
                             .background(Color.primary.opacity(0.05))
                             .cornerRadius(4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                            )
+                        } else {
+                            Text(entry.displayValue)
+                                .font(.system(size: 11, design: .monospaced))
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textSelection(.enabled)
+                                .padding(6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.primary.opacity(0.05))
+                                .cornerRadius(4)
+                        }
                     }
                 }
             }
         } else {
-            Text(cleanFallbackString)
-                .font(.system(size: 11, design: .monospaced))
-                .lineLimit(nil)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
-                .padding(6)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if isLongText(cleanFallbackString) {
+                ScrollView(.vertical, showsIndicators: true) {
+                    Text(cleanFallbackString)
+                        .font(.system(size: 11, design: .monospaced))
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                        .padding(6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(height: 120)
                 .background(Color.primary.opacity(0.05))
                 .cornerRadius(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+                )
+            } else {
+                Text(cleanFallbackString)
+                    .font(.system(size: 11, design: .monospaced))
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.05))
+                    .cornerRadius(4)
+            }
         }
+    }
+
+    private func isLongText(_ text: String) -> Bool {
+        text.count > 160 || text.components(separatedBy: "\n").count > 3
     }
 
     private var cleanFallbackString: String {
