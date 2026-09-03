@@ -519,27 +519,46 @@ public struct ToolCallCardView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     if !toolCall.argumentsJson.isEmpty && toolCall.argumentsJson != "{}" {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("INPUT ARGUMENTS")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.secondary)
-                            Text(toolCall.argumentsJson)
-                                .font(.caption.monospaced())
-                                .padding(6)
-                                .background(Color.primary.opacity(0.04))
-                                .cornerRadius(4)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("INPUT ARGUMENTS")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            ParsedArgumentsView(jsonString: toolCall.argumentsJson)
                         }
                     }
 
                     if !toolCall.output.isEmpty {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("TOOL OUTPUT")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("TOOL OUTPUT")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Button {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(toolCall.output, forType: .string)
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "doc.on.doc")
+                                        Text("Copy")
+                                    }
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
                             Text(toolCall.output)
-                                .font(.caption.monospaced())
+                                .font(.system(size: 11, design: .monospaced))
+                                .lineLimit(nil)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .textSelection(.enabled)
                                 .padding(6)
-                                .background(Color.primary.opacity(0.04))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.primary.opacity(0.05))
                                 .cornerRadius(4)
                         }
                     }
@@ -582,5 +601,86 @@ public struct ToolCallCardView: View {
         case "query_notion": return "doc.text.fill"
         default: return "gearshape.fill"
         }
+    }
+}
+
+/// Renders structured tool call arguments as clean, readable key-value blocks.
+public struct ParsedArgumentsView: View {
+    public let jsonString: String
+
+    public init(jsonString: String) {
+        self.jsonString = jsonString
+    }
+
+    private var parsedDictionary: [(key: String, displayValue: String)]? {
+        guard let data = jsonString.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              !dict.isEmpty else {
+            return nil
+        }
+
+        return dict.sorted(by: { $0.key < $1.key }).map { (key: $0.key, displayValue: formatValue($0.value)) }
+    }
+
+    private func formatValue(_ value: Any) -> String {
+        if let str = value as? String {
+            return str.replacingOccurrences(of: "\\/", with: "/")
+        }
+        if let num = value as? NSNumber {
+            return num.stringValue
+        }
+        if let bool = value as? Bool {
+            return bool ? "true" : "false"
+        }
+        if let data = try? JSONSerialization.data(withJSONObject: value, options: [.prettyPrinted, .withoutEscapingSlashes]),
+           let str = String(data: data, encoding: .utf8) {
+            return str
+        }
+        return "\(value)"
+    }
+
+    public var body: some View {
+        if let entries = parsedDictionary, !entries.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(entries, id: \.key) { entry in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(entry.key)
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.purple)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Color.purple.opacity(0.12))
+                                .cornerRadius(3)
+                            Spacer()
+                        }
+
+                        Text(entry.displayValue)
+                            .font(.system(size: 11, design: .monospaced))
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textSelection(.enabled)
+                            .padding(6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.primary.opacity(0.05))
+                            .cornerRadius(4)
+                    }
+                }
+            }
+        } else {
+            Text(cleanFallbackString)
+                .font(.system(size: 11, design: .monospaced))
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+                .padding(6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.primary.opacity(0.05))
+                .cornerRadius(4)
+        }
+    }
+
+    private var cleanFallbackString: String {
+        jsonString.replacingOccurrences(of: "\\/", with: "/")
     }
 }

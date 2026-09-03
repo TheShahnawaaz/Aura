@@ -38,7 +38,7 @@ public final class AgentEngine: @unchecked Sendable {
 
                 var argsJson = ""
                 if let inputObj = input.toolInput,
-                   let data = try? JSONSerialization.data(withJSONObject: inputObj, options: [.prettyPrinted]),
+                   let data = try? JSONSerialization.data(withJSONObject: inputObj, options: [.prettyPrinted, .withoutEscapingSlashes]),
                    let str = String(data: data, encoding: .utf8) {
                     argsJson = str
                 } else if let inputObj = input.toolInput {
