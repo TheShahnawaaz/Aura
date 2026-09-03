@@ -15,9 +15,10 @@ public final class AgentEngine: @unchecked Sendable {
         userPrompt: String,
         isVoice: Bool,
         onPhaseUpdate: (@Sendable (String) -> Void)? = nil,
+        onInterimText: (@Sendable (String) -> Void)? = nil,
         onToolStart: (@Sendable (ToolCallRecord) -> Void)? = nil,
         onToolFinish: (@Sendable (ToolCallRecord) -> Void)? = nil
-    ) async throws -> (finalAnswer: String, executedTools: [ToolCallRecord]) {
+    ) async throws -> (interimSpeech: String?, finalAnswer: String, executedTools: [ToolCallRecord]) {
         let apiKey = LLMService.shared.resolveApiKey()
         let baseURL = LLMService.shared.resolveBaseURL()
         let model = LLMService.shared.resolveModel()
@@ -87,9 +88,9 @@ public final class AgentEngine: @unchecked Sendable {
         }
 
         // Read configuration from CapabilityConfigManager
-        let (compOn, termOn, scriptOn, webOn, fsOn, visionOn) = await MainActor.run {
+        let (compOn, termOn, scriptOn, webOn, fsOn, visionOn, thinkingEffort) = await MainActor.run {
             let cfg = CapabilityConfigManager.shared
-            return (cfg.isComputerEnabled, cfg.isTerminalEnabled, cfg.isMacScriptEnabled, cfg.isWebEnabled, cfg.isFileSystemEnabled, cfg.isVisionEnabled)
+            return (cfg.isComputerEnabled, cfg.isTerminalEnabled, cfg.isMacScriptEnabled, cfg.isWebEnabled, cfg.isFileSystemEnabled, cfg.isVisionEnabled, cfg.resolvedEffortLevel)
         }
 
         // Only disallow tools that are specifically replaced (Bash -> terminal, AskUser -> GUI) or explicitly turned OFF by user
@@ -99,7 +100,7 @@ public final class AgentEngine: @unchecked Sendable {
         if !scriptOn { disallowed.append("mac_script") }
         if !webOn { disallowed.append(contentsOf: ["WebFetch", "WebSearch"]) }
         if !fsOn { disallowed.append(contentsOf: ["Read", "Write", "Edit", "Glob", "Grep"]) }
-        if !visionOn { disallowed.append("view_image") }
+        if !visionOn { disallowed.append(contentsOf: ["view_image", "take_screenshot"]) }
 
         var activeToolNames = allTools.map { $0.name }
         if webOn {
@@ -113,44 +114,107 @@ public final class AgentEngine: @unchecked Sendable {
         let toolListSummary = activeToolNames.joined(separator: ", ")
         let skillListSummary = activeSkillReg.allSkills.map { $0.name }.joined(separator: ", ")
 
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "EEEE, MMMM d, yyyy"
+        let currentDateString = dateFormatter.string(from: Date())
+
+        let structuredSystemPrompt = """
+        <SYSTEM_ENVIRONMENT>
+        * Platform: macOS (Darwin)
+        * Shell: /bin/zsh
+        * Date: \(currentDateString)
+        * Active Native Tools: [\(toolListSummary)]
+        * Active Domain Skills: [\(skillListSummary.isEmpty ? "none" : skillListSummary)]
+        * Connected MCP Connectors: [\(mcpSummary)]
+        </SYSTEM_ENVIRONMENT>
+
+        <OPERATING_PROCEDURE>
+        1. UNDERSTAND & ROUTE INTENT:
+           - For informational or capability questions (e.g. "What can you do?", "What tools are active?"), answer directly and conversationally from your knowledge without running shell or diagnostic tools.
+           - For action or inspection requests (checking screen, searching repositories, opening apps, taking screenshots, running terminal commands), immediately invoke the relevant tool.
+        2. ATOMIC EXECUTION:
+           - Call the narrowest, most targeted tool for the task.
+        3. ACTION GROUNDING & ZERO UNFULFILLED PROMISES (CRITICAL):
+           - When answering requires visual inspection or checking system/window state (e.g. "Which software is this open?"), you MUST invoke the appropriate tool (such as `take_screenshot`) in the EXACT SAME TURN.
+           - NEVER end your turn on an unfulfilled conversational promise like "let me take a quick look at your screen" without attaching the tool call. If you speak, attach the tool in the same turn so it executes immediately.
+        4. EVALUATE TOOL RESULTS:
+           - Always inspect the latest tool result. If a tool returns SUCCESS or valid UI/terminal output, the action succeeded. Never claim an action failed if the tool succeeded.
+        5. FAST-FAIL ON PERMISSIONS:
+           - Only if a tool returns an explicit permission error regarding Accessibility, Assistive access, or Screen Recording, inform the user and direct them to Aura's Permissions Hub in Settings. Do not loop across multiple tools.
+        </OPERATING_PROCEDURE>
+
+        <TOOL_ROUTING_MATRIX>
+        * VISUAL & SCREEN INSPECTION:
+          - Use `take_screenshot` to view the user's screen, read visible windows, OCR text, or check which application is open. Full image pixels are attached directly to your context.
+          - Use `view_image` to inspect image files located on disk.
+        * SCRIPTABLE MAC APPS:
+          - Use `mac_script` for scriptable apps (Notes, Music, Finder, Safari, Calendar, Reminders). Never tunnel osascript through terminal.
+        * SHELL & DEVELOPER TASKS:
+          - Use `terminal` for non-interactive zsh commands, git operations, file inspection, and local build tools.
+        * UI ACCESSIBILITY AUTOMATION:
+          - Use `computer` strictly for interactive UI clicking and typing. First call action 'observe', then use the exact element_id for 'click' or 'set_value'. Never invent element IDs.
+        * DOMAIN SKILLS:
+          - Use `Skill` to invoke active domain workflows when the user intent matches a skill.
+        </TOOL_ROUTING_MATRIX>
+
+        <SPEECH_AND_FORMATTING>
+        * Keep responses direct, natural, and conversational.
+        * Do NOT use markdown asterisks (*, **), raw code fences, or bullet lists in conversational summaries so responses sound clean and fluid when spoken aloud.
+        </SPEECH_AND_FORMATTING>
+        """
+
         let options = AgentOptions(
             apiKey: apiKey,
             model: model,
             baseURL: baseURL,
             provider: provider,
-            systemPrompt: """
-            You are Aura, an intelligent macOS voice and desktop AI assistant with full multimodal vision.
-            Active native tools: [\(toolListSummary)].
-            Active domain skills: [\(skillListSummary.isEmpty ? "none" : skillListSummary)].
-            Connected MCP connectors: [\(mcpSummary)].
-
-            CORE RULES:
-            1. CONVERSATIONAL & CAPABILITY QUESTIONS: When the user asks about your capabilities, tools, connected MCP servers, or registered skills, answer directly and conversationally from your knowledge without running shell commands. You have native macOS automation (computer, terminal, mac_script), native multimodal vision capabilities (computer with screenshot action to view the screen, and view_image to inspect images on disk), built-in web tools (WebFetch for fetching URLs and reading web pages, WebSearch for web search queries), built-in filesystem tools (Read, Write, Edit, Glob, Grep), connected MCP connectors ([\(mcpSummary)]), and domain skills ([\(skillListSummary)]). If the user asks about an active capability or tool, explain that it is active and available.
-            2. ACTION & INSPECTION REQUESTS: Only invoke tools when the user explicitly requests an action (such as fetching a webpage, searching repositories, opening an application, creating a note, clicking UI, running a script) or asks to inspect system files.
-            3. EVALUATING TOOL RESULTS & GROUNDING: Always inspect the latest tool result. If a tool succeeds or returns UI observation data / SUCCESS, the action SUCCEEDED and permissions ARE active. Confirm the success clearly to the user. Never claim an action failed if the tool succeeded. Do not be confused by prior conversation turns or by previous error messages visible inside observed window text.
-            4. FAST-FAIL ON REAL ERRORS: Only if a tool actually returns an explicit error message regarding Accessibility, Assistive access, or Screen Recording, inform the user and point them to Aura's Permissions Hub in Settings. Do not retry 4-5 alternative tools in a loop.
-            5. APP AUTOMATION: Prefer mac_script for scriptable apps (Notes, Music, Finder, Safari, Calendar). Never tunnel AppleScript through terminal. Apps without scripting dictionaries (like Clock) or web logins (like YouTube subscription) should not be forced with multiple blind AppleScript attempts; open the app or guide the user instead.
-            6. UI CONTROL: For app UI tasks, first call computer with action observe. Use element IDs only from that response, re-observe after every state-changing action, and never guess an element ID.
-            7. SKILLS: Use the Skill tool to inspect or execute active registered domain skills when the user's intent matches a skill.
-            8. MULTI-STEP REASONING: Call tools iteratively when required, but stop immediately if an action encounters a hard permission barrier.
-            9. CONTEXT RETENTION: Always remember facts the user shared throughout the entire conversation.
-            10. CONCISE, NATURAL SPEECH: Keep responses direct, friendly, and conversational. Do NOT use markdown asterisks (*, **), bullet lists, or headers so the response sounds clean when spoken aloud.
-            11. VISION & IMAGE UNDERSTANDING: You have full multimodal visual capabilities. When you invoke computer with action screenshot, full visual pixels of the screen are attached directly to your context. Examine the screenshot to read visible UI, OCR text, identify windows, or detect errors. To inspect any image on disk (photos, UI mockups, diagrams, screenshots), invoke view_image(file_path: ...). Never claim you cannot read or see images; you have vision tools.
-            """,
+            systemPrompt: structuredSystemPrompt,
             maxTurns: 10,
+            thinking: .adaptive,
             permissionMode: .bypassPermissions,
             tools: allTools,
             mcpServers: mcpConfigs,
             hookRegistry: hookRegistry,
             skillRegistry: activeSkillReg,
-            disallowedTools: disallowed
+            disallowedTools: disallowed,
+            effort: thinkingEffort
         )
 
         let agent = createAgent(options: options)
         onPhaseUpdate?("Thinking...")
 
-        let result = await agent.prompt(historyContext)
-        let executed = await toolTracker.records
+        var result = await agent.prompt(historyContext)
+        var executed = await toolTracker.records
+        var interimSpeech: String? = nil
+
+        // Runtime Continuation Guard:
+        // If the model produced text promising an action/inspection (e.g. "let me take a look at your screen")
+        // but emitted 0 tool calls in that turn, proactively trigger the tool so the user is never left hanging!
+        let lowerText = result.text.lowercased()
+        let promisesInspection = (
+            lowerText.contains("let me take a") ||
+            lowerText.contains("let me look") ||
+            lowerText.contains("let me check") ||
+            lowerText.contains("taking a look") ||
+            lowerText.contains("checking your screen") ||
+            lowerText.contains("take a quick look") ||
+            lowerText.contains("let me see what")
+        )
+
+        if executed.isEmpty && promisesInspection {
+            let capturedInterim = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            interimSpeech = capturedInterim
+            onInterimText?(capturedInterim)
+            onPhaseUpdate?("Inspecting screen...")
+
+            let nudgePrompt = "You stated you would take a look or check the screen, but no tool was invoked in that turn. Please call the required tool (such as take_screenshot) now to complete the user's request."
+            let continuationResult = await agent.prompt(nudgePrompt)
+            let continuationExecuted = await toolTracker.records
+            if !continuationExecuted.isEmpty {
+                executed = continuationExecuted
+                result = continuationResult
+            }
+        }
 
         var answer = result.text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
         if answer.isEmpty {
@@ -161,7 +225,7 @@ public final class AgentEngine: @unchecked Sendable {
             }
         }
 
-        return (answer, executed)
+        return (interimSpeech, answer, executed)
     }
 
     private func buildHistoryContext(session: ConversationSession, currentPrompt: String) -> String {

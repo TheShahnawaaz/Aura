@@ -5,14 +5,14 @@ import OpenAgentSDK
 final class AgentSDKTests: XCTestCase {
     func testToolDefinitionsValidity() {
         let tools = ToolRegistry.shared.toolDefinitions
-        XCTAssertEqual(tools.count, 3, "Aura should expose only its three generic native capabilities")
+        XCTAssertEqual(tools.count, 4, "Aura should expose its native capabilities including take_screenshot")
 
         let names = tools.compactMap { tool -> String? in
             let fn = tool["function"] as? [String: Any]
             return fn?["name"] as? String
         }
 
-        XCTAssertEqual(Set(names), ["computer", "terminal", "mac_script"])
+        XCTAssertEqual(Set(names), ["take_screenshot", "computer", "terminal", "mac_script"])
     }
 
     func testSessionSerializationAndStorage() {
@@ -73,10 +73,10 @@ final class AgentSDKTests: XCTestCase {
 
     func testOpenAgentSDKNativeTools() {
         let tools = AuraTools.allTools()
-        XCTAssertEqual(tools.count, 4, "AuraTools should register four native tools (computer, terminal, mac_script, view_image)")
+        XCTAssertEqual(tools.count, 5, "AuraTools should register five native tools (computer, take_screenshot, terminal, mac_script, view_image)")
 
         let toolNames = tools.map { $0.name }
-        XCTAssertEqual(Set(toolNames), ["computer", "terminal", "mac_script", "view_image"])
+        XCTAssertEqual(Set(toolNames), ["computer", "take_screenshot", "terminal", "mac_script", "view_image"])
     }
 
     func testControlPolicyRequiresApprovalForMutation() {

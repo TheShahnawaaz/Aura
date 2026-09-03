@@ -13,6 +13,7 @@ public struct ToolsSettingsView: View {
             headerBar
 
             VStack(spacing: 16) {
+                thinkingEffortCard
                 computerCard
                 terminalCard
                 macScriptCard
@@ -44,6 +45,42 @@ public struct ToolsSettingsView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
+    }
+
+    // MARK: - Thinking Effort Card
+    private var thinkingEffortCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center) {
+                Image(systemName: "brain.head.profile")
+                    .font(.title2)
+                    .foregroundColor(.purple)
+                    .frame(width: 36, height: 36)
+                    .background(Color.purple.opacity(0.12))
+                    .cornerRadius(8)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Agent Reasoning & Deliberation")
+                        .font(.headline)
+                    Text("Sets the depth of adaptive thinking and self-criticism before executing tools.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Picker("", selection: $capabilityConfig.thinkingEffort) {
+                    Text("Low").tag("low")
+                    Text("Medium (Recommended)").tag("medium")
+                    Text("High").tag("high")
+                }
+                .pickerStyle(.menu)
+                .frame(width: 190)
+            }
+        }
+        .padding(16)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.secondary.opacity(0.15), lineWidth: 1))
     }
 
     // MARK: - 1. Computer Tool Card

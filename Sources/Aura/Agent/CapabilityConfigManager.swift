@@ -2,10 +2,25 @@ import Foundation
 import SwiftUI
 import Combine
 
+import OpenAgentSDK
+
 /// Central manager and persistence coordinator for Aura's tools, skills, and capabilities.
 @MainActor
 public final class CapabilityConfigManager: ObservableObject {
     public static let shared = CapabilityConfigManager()
+
+    // MARK: - Agent Thinking / Deliberation
+    @Published public var thinkingEffort: String {
+        didSet { UserDefaults.standard.set(thinkingEffort, forKey: "cap_agent_thinking_effort") }
+    }
+
+    public var resolvedEffortLevel: EffortLevel {
+        switch thinkingEffort.lowercased() {
+        case "low": return .low
+        case "high": return .high
+        default: return .medium
+        }
+    }
 
     // MARK: - Native Tool Master Toggles
     @Published public var isComputerEnabled: Bool {
@@ -61,6 +76,9 @@ public final class CapabilityConfigManager: ObservableObject {
     private init() {
         let defaults = UserDefaults.standard
 
+        // Agent thinking defaults (default to medium)
+        self.thinkingEffort = defaults.string(forKey: "cap_agent_thinking_effort") ?? "medium"
+
         // Tools defaults (default to true)
         self.isComputerEnabled = defaults.object(forKey: "cap_tool_computer_enabled") as? Bool ?? true
         self.isTerminalEnabled = defaults.object(forKey: "cap_tool_terminal_enabled") as? Bool ?? true
@@ -93,6 +111,7 @@ public final class CapabilityConfigManager: ObservableObject {
     public func isToolEnabled(_ name: String) -> Bool {
         switch name.lowercased() {
         case "computer": return isComputerEnabled
+        case "take_screenshot": return isVisionEnabled && allowScreenshots
         case "terminal", "execute_terminal_command": return isTerminalEnabled
         case "mac_script": return isMacScriptEnabled
         case "webfetch", "websearch": return isWebEnabled
@@ -105,6 +124,12 @@ public final class CapabilityConfigManager: ObservableObject {
     /// Validates whether a specific sub-action for a tool is allowed.
     public func isSubActionAllowed(tool: String, action: String) -> (allowed: Bool, reason: String?) {
         switch tool.lowercased() {
+        case "take_screenshot":
+            guard isVisionEnabled && allowScreenshots else {
+                return (false, "Screenshot capture is disabled in Capabilities Settings.")
+            }
+            return (true, nil)
+
         case "computer":
             guard isComputerEnabled else {
                 return (false, "The computer tool is currently disabled in Capabilities Settings.")

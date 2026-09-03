@@ -8,6 +8,9 @@ public final class ToolRegistry: @unchecked Sendable {
 
     public var toolDefinitions: [[String: Any]] {
         [
+            definition(name: "take_screenshot", properties: [
+                "app_bundle_id": ["type": "string", "description": "Optional bundle identifier to focus on a specific app"]
+            ], required: []),
             definition(name: "computer", properties: [
                 "action": ["type": "string", "enum": ["observe", "click", "set_value", "press_key", "scroll", "screenshot"]]
             ], required: ["action"]),
@@ -22,6 +25,8 @@ public final class ToolRegistry: @unchecked Sendable {
         do {
             let output: String
             switch name {
+            case "take_screenshot":
+                output = try ComputerControlService.shared.takeScreenshot()
             case "terminal":
                 let command = try required(arguments["command"] as? String, "command")
                 let safety = GuardrailsEngine.shared.evaluateTool(name: name, input: arguments)

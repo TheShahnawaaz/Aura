@@ -128,6 +128,7 @@ public final class AgentSessionManager: ObservableObject {
         updateSessionInList(targetSession)
 
         // 4. Run ReAct Agent loop with real-time progressive callbacks
+        var interimSpeech: String? = nil
         var finalAnswer = "Understood."
         var executedTools: [ToolCallRecord] = []
 
@@ -139,6 +140,16 @@ public final class AgentSessionManager: ObservableObject {
                 onPhaseUpdate: { phase in
                     Task { @MainActor in
                         AppState.shared.state = .processing(phase: phase)
+                    }
+                },
+                onInterimText: { text in
+                    Task { @MainActor in
+                        guard let sIdx = self.sessions.firstIndex(where: { $0.id == targetSession.id }),
+                              let mIdx = self.sessions[sIdx].messages.firstIndex(where: { $0.id == assistantMessageId }) else { return }
+                        self.sessions[sIdx].messages[mIdx].content = text
+                        if self.activeSession.id == targetSession.id {
+                            self.activeSession = self.sessions[sIdx]
+                        }
                     }
                 },
                 onToolStart: { record in
@@ -166,6 +177,7 @@ public final class AgentSessionManager: ObservableObject {
                     }
                 }
             )
+            interimSpeech = result.interimSpeech
             finalAnswer = result.finalAnswer
             executedTools = result.executedTools
         } catch {
@@ -175,9 +187,25 @@ public final class AgentSessionManager: ObservableObject {
         // 5. Finalize assistant response message & persist
         if let sIdx = self.sessions.firstIndex(where: { $0.id == targetSession.id }),
            let mIdx = self.sessions[sIdx].messages.firstIndex(where: { $0.id == assistantMessageId }) {
-            self.sessions[sIdx].messages[mIdx].content = finalAnswer
-            if !executedTools.isEmpty {
+            if let interim = interimSpeech, !interim.isEmpty, !executedTools.isEmpty {
+                // Split into discrete messages: bubble 1 with interim text & tools, bubble 2 with final answer
+                self.sessions[sIdx].messages[mIdx].content = interim
                 self.sessions[sIdx].messages[mIdx].toolCalls = executedTools
+
+                let followUpMessageId = UUID().uuidString
+                let finalMsg = ChatMessage(
+                    id: followUpMessageId,
+                    role: .assistant,
+                    content: finalAnswer,
+                    toolCalls: [],
+                    isVoice: isVoice
+                )
+                self.sessions[sIdx].messages.append(finalMsg)
+            } else {
+                self.sessions[sIdx].messages[mIdx].content = finalAnswer
+                if !executedTools.isEmpty {
+                    self.sessions[sIdx].messages[mIdx].toolCalls = executedTools
+                }
             }
             self.sessions[sIdx].updatedAt = Date()
             self.activeSession = self.sessions[sIdx]

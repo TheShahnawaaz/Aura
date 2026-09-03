@@ -15,6 +15,10 @@ public struct ComputerInput: Codable, Sendable {
     public let amount: Int?
 }
 
+public struct TakeScreenshotInput: Codable, Sendable {
+    public let app_bundle_id: String?
+}
+
 public struct TerminalInput: Codable, Sendable {
     public let command: String
     public let cwd: String?
@@ -38,28 +42,68 @@ public struct ViewImageInput: Codable, Sendable {
 }
 
 public enum AuraTools {
-    public static func allTools() -> [ToolProtocol] { [computerTool, terminalTool, macScriptTool, viewImageTool] }
+    public static func allTools() -> [ToolProtocol] { [computerTool, takeScreenshotTool, terminalTool, macScriptTool, viewImageTool] }
 
     @MainActor
     public static func enabledTools() -> [ToolProtocol] {
         var tools: [ToolProtocol] = []
         let config = CapabilityConfigManager.shared
         if config.isComputerEnabled { tools.append(computerTool) }
+        if config.isVisionEnabled && config.allowScreenshots { tools.append(takeScreenshotTool) }
         if config.isTerminalEnabled { tools.append(terminalTool) }
         if config.isMacScriptEnabled { tools.append(macScriptTool) }
         if config.isVisionEnabled { tools.append(viewImageTool) }
         return tools
     }
 
-    public static let computerTool: ToolProtocol = defineTool(
-        name: "computer",
-        description: "Controls the visible macOS UI. First call observe, then use only element_id values from that exact observation. Re-observe after every UI-changing action. Never invent element IDs. When action is screenshot, full screen image pixels are attached directly to your context for visual reading, OCR, and window inspection.",
+    public static let takeScreenshotTool: ToolProtocol = defineTool(
+        name: "take_screenshot",
+        description: """
+        Captures the visible screen (or optionally a specific app window) as an image.
+        Full visual pixels are attached directly into your context for OCR, reading text, window inspection, identifying open software, or verifying UI state changes.
+        - USE FOR: Identifying currently open software/windows, reading on-screen text, checking UI layouts, visual inspection, or verifying UI changes.
+        - DO NOT USE FOR: Manipulating buttons or typing text (use `computer` or `mac_script` instead).
+        - PARAMETERS: `app_bundle_id` is optional. Omit it to capture the entire main desktop screen.
+        """,
         inputSchema: [
             "type": "object",
             "properties": [
-                "action": ["type": "string", "enum": ["observe", "click", "set_value", "press_key", "scroll", "screenshot"]],
+                "app_bundle_id": [
+                    "type": "string",
+                    "description": "Optional application bundle identifier (e.g. com.apple.Safari) to focus on a specific app"
+                ]
+            ]
+        ],
+        isReadOnly: true
+    ) { (input: TakeScreenshotInput, _: ToolContext) async throws -> ToolExecuteResult in
+        let check = await CapabilityConfigManager.shared.isSubActionAllowed(tool: "take_screenshot", action: "screenshot")
+        if !check.allowed {
+            throw AuraToolError.actionDisabled(check.reason ?? "Screenshot capture is disabled in Capabilities Settings.")
+        }
+        let cap = try ComputerControlService.shared.captureScreenshotData()
+        return ToolExecuteResult(
+            typedContent: [
+                .text("Screenshot captured successfully (\(cap.width)x\(cap.height)). Saved to \(cap.path). Visual pixels attached below:"),
+                .image(data: cap.data, mimeType: cap.mimeType)
+            ],
+            isError: false
+        )
+    }
+
+    public static let computerTool: ToolProtocol = defineTool(
+        name: "computer",
+        description: """
+        Interacts with macOS UI elements via Accessibility.
+        - WORKFLOW: First call action 'observe' to inspect the UI hierarchy and obtain valid element IDs. Then use only element_id values returned from that exact observation. Re-observe after every state-changing action.
+        - PRECONDITIONS: Element IDs expire after every UI action. Never guess element IDs.
+        - DO NOT USE FOR: Taking screenshots to view the screen (use `take_screenshot` instead), or automating scriptable apps like Music/Notes/Finder (use `mac_script` instead).
+        """,
+        inputSchema: [
+            "type": "object",
+            "properties": [
+                "action": ["type": "string", "enum": ["observe", "click", "set_value", "press_key", "scroll"]],
                 "app_bundle_id": ["type": "string", "description": "Required for observe unless the frontmost app is intended, for example com.apple.TextEdit"],
-                "element_id": ["type": "string", "description": "An opaque ID returned by the newest observe response"],
+                "element_id": ["type": "string", "description": "An opaque ID returned by the newest observe response (required for click and set_value)"],
                 "value": ["type": "string", "description": "Text for set_value"],
                 "keys": ["type": "array", "items": ["type": "string"], "description": "One key plus optional cmd, control, option, or shift modifiers"],
                 "direction": ["type": "string", "enum": ["up", "down", "left", "right"]],
@@ -202,7 +246,16 @@ public enum AuraTools {
 
     public static let terminalTool: ToolProtocol = defineTool(
         name: "terminal",
-        description: "Runs a zsh command for local development and system work. Prefer direct read-only commands. Do not use terminal to run osascript; use mac_script so Aura can audit Apple Events.",
+        description: """
+        Executes a non-interactive zsh shell command on macOS for development, git, filesystem, and system inspection.
+        - USE FOR: Git operations (git status, log, diff), filesystem commands (ls, cat, find), checking running processes (ps, pgrep), reading configurations, and compiling code.
+        - DO NOT USE FOR:
+          * Interactive commands requiring continuous TTY input (e.g., vim, nano, top, sudo).
+          * GUI app interaction (use `mac_script` or `computer` instead).
+          * Running `osascript` directly (use `mac_script` instead so Apple Events permissions are audited).
+        - PARAMETERS: `command` is required. `cwd` is optional working directory.
+        - RETURNS: Command stdout or stderr output.
+        """,
         inputSchema: [
             "type": "object",
             "properties": [
@@ -231,7 +284,16 @@ public enum AuraTools {
 
     public static let macScriptTool: ToolProtocol = defineTool(
         name: "mac_script",
-        description: "Runs AppleScript or JavaScript for Automation (JXA) using the macOS automation system. Prefer it for apps with a scripting dictionary. Provide language as applescript or javascript.",
+        description: """
+        Executes AppleScript or JavaScript for Automation (JXA) directly via the macOS automation engine.
+        - USE FOR: Controlling scriptable macOS applications such as Notes, Music, Finder, Safari, Mail, Reminders, and Calendar.
+        - DO NOT USE FOR: Shell commands (use `terminal` instead) or non-scriptable apps without an AppleScript dictionary (use `computer` instead).
+        - EXAMPLES:
+          * Play music: tell application "Music" to play
+          * Make note: tell application "Notes" to make new note with properties {name:"Title", body:"Content"}
+          * Open URL: tell application "Safari" to open location "https://apple.com"
+        - PARAMETERS: `language` must be 'applescript' or 'javascript', and `source` is the script code.
+        """,
         inputSchema: [
             "type": "object",
             "properties": [
