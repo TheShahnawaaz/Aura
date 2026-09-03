@@ -32,15 +32,6 @@ public final class AgentEngine: @unchecked Sendable {
             handler: { input in
                 let toolName = input.toolName ?? "Tool"
                 onPhaseUpdate?("Running \(toolName)...")
-
-                // Check security guardrails for commands
-                if let dict = input.toolInput as? [String: Any],
-                   let cmd = dict["command"] as? String {
-                    let safety = GuardrailsEngine.shared.evaluateCommand(cmd)
-                    if case .requiresConfirmation(let req) = safety {
-                        return HookOutput(message: "Blocked dangerous command: \(req.commandOrAction)", block: true)
-                    }
-                }
                 return nil
             }
         ))
@@ -71,7 +62,33 @@ public final class AgentEngine: @unchecked Sendable {
             }
         ))
 
+        await hookRegistry.register(.postToolUseFailure, definition: HookDefinition(
+            handler: { input in
+                let toolName = input.toolName ?? "Tool"
+                let errStr = input.error ?? "Tool execution failed"
+
+                var argsJson = ""
+                if let inputObj = input.toolInput,
+                   let data = try? JSONSerialization.data(withJSONObject: inputObj),
+                   let str = String(data: data, encoding: .utf8) {
+                    argsJson = str
+                }
+
+                await toolTracker.addRecord(ToolCallRecord(
+                    toolName: toolName,
+                    argumentsJson: argsJson,
+                    output: errStr,
+                    status: .failure,
+                    latencyMs: 150
+                ))
+                return nil
+            }
+        ))
+
         let mcpConfigs = await MCPManager.shared.toMcpServerConfigs()
+
+        var allTools = AuraTools.allTools()
+        allTools.append(createSkillTool(registry: AuraSkillRegistry.shared.registry))
 
         let options = AgentOptions(
             apiKey: apiKey,
@@ -80,18 +97,23 @@ public final class AgentEngine: @unchecked Sendable {
             provider: provider,
             systemPrompt: """
             You are Aura, an intelligent macOS voice and desktop AI assistant.
-            You have native tools to inspect and control macOS: launching applications, adjusting system volume, inspecting folders, taking screenshots, querying Notion, searching Gmail, and executing shell commands in zsh.
+            You have three local capabilities (computer for visible macOS UI, terminal for shell work, mac_script for AppleScript/JXA) and three built-in domain skills (mac_control, developer_inspection, and productivity) accessible via your Skill tool, plus any custom skills discovered in ~/.aura/skills.
 
             CORE RULES:
-            1. PROACTIVE TOOL EXECUTION: When the user asks about their system, files, installed tools, or programming languages (e.g. "what programming languages are installed", "what is on my desktop", "check my python version", "find my projects"), ALWAYS use your tools proactively (`execute_terminal_command` or `list_files`).
-            2. NEVER REFUSE AS 'TOO BROAD': Never tell the user that an inspection request is "too broad" or refuse to check. Run safe shell commands to discover the answer and synthesize a crisp summary.
-            3. MULTI-STEP REASONING: Call multiple tools iteratively until you have enough information to fulfill the user's intent.
-            4. CONTEXT RETENTION: Always remember facts the user shared throughout the entire conversation.
-            5. CONCISE, NATURAL SPEECH: Keep responses direct, friendly, and conversational. Do NOT use markdown asterisks (*, **), bullet lists, or headers so the response sounds clean when spoken aloud.
+            1. CONVERSATIONAL & CAPABILITY QUESTIONS: When the user asks about your capabilities, tools, or registered skills (e.g. "What skills do you have?"), answer directly and conversationally from your knowledge without invoking tools. Explicitly state your three domain skills (mac_control, developer_inspection, and productivity), the Skill tool, and your native tools. Do NOT use terminal or filesystem commands to search external app directories (such as Claude) for skills.
+            2. ACTION & INSPECTION REQUESTS: Only invoke tools when the user explicitly requests an action (such as opening an application, creating a note, clicking UI, running a script) or asks to inspect system files.
+            3. EVALUATING TOOL RESULTS & GROUNDING: Always inspect the latest tool result. If a tool succeeds or returns UI observation data / SUCCESS, the action SUCCEEDED and permissions ARE active. Confirm the success clearly to the user. Never claim an action failed if the tool succeeded. Do not be confused by prior conversation turns or by previous error messages visible inside observed window text.
+            4. FAST-FAIL ON REAL ERRORS: Only if a tool actually returns an explicit error message regarding Accessibility, Assistive access, or Screen Recording, inform the user and point them to Aura's Permissions Hub in Settings. Do not retry 4-5 alternative tools in a loop.
+            5. APP AUTOMATION: Prefer mac_script for scriptable apps (Notes, Music, Finder, Safari, Calendar). Never tunnel AppleScript through terminal. Apps without scripting dictionaries (like Clock) or web logins (like YouTube subscription) should not be forced with multiple blind AppleScript attempts; open the app or guide the user instead.
+            6. UI CONTROL: For app UI tasks, first call computer with action observe. Use element IDs only from that response, re-observe after every state-changing action, and never guess an element ID.
+            7. SKILLS: Use the Skill tool to inspect or execute registered domain skills (mac_control, developer_inspection, productivity) when the user's intent matches a skill.
+            8. MULTI-STEP REASONING: Call tools iteratively when required, but stop immediately if an action encounters a hard permission barrier.
+            9. CONTEXT RETENTION: Always remember facts the user shared throughout the entire conversation.
+            10. CONCISE, NATURAL SPEECH: Keep responses direct, friendly, and conversational. Do NOT use markdown asterisks (*, **), bullet lists, or headers so the response sounds clean when spoken aloud.
             """,
             maxTurns: 10,
             permissionMode: .bypassPermissions,
-            tools: AuraTools.allTools(),
+            tools: allTools,
             mcpServers: mcpConfigs,
             hookRegistry: hookRegistry,
             skillRegistry: AuraSkillRegistry.shared.registry
@@ -128,7 +150,8 @@ public final class AgentEngine: @unchecked Sendable {
             let role = msg.role == .user ? "User" : "Aura"
             context += "[\(role)]: \(msg.content)\n"
             for t in msg.toolCalls {
-                context += "  ↳ [Tool \(t.toolName)]: \(t.output.prefix(150))\n"
+                let status = t.status == .success ? "SUCCESS" : "FAILED"
+                context += "  ↳ [Tool \(t.toolName) (\(status))]: \(t.output.prefix(150))\n"
             }
         }
         context += "=== END CONVERSATION HISTORY ===\n\n"

@@ -1,252 +1,126 @@
-import AppKit
 import Foundation
 import OpenAgentSDK
 
-// MARK: - Strongly-Typed Tool Input Models
-
-public struct AppLauncherInput: Codable, Sendable {
-    public let app_name: String
-
-    public init(app_name: String) {
-        self.app_name = app_name
-    }
-}
-
-public struct VolumeInput: Codable, Sendable {
+/// The agent has three generic capabilities. Concrete actions are expressed as typed input,
+/// which keeps the model surface compact without turning the policy layer into prompt text.
+public struct ComputerInput: Codable, Sendable {
     public let action: String
-
-    public init(action: String) {
-        self.action = action
-    }
+    public let app_bundle_id: String?
+    public let element_id: String?
+    public let value: String?
+    public let keys: [String]?
+    public let direction: String?
+    public let amount: Int?
 }
 
-public struct ListFilesInput: Codable, Sendable {
-    public let directory: String
-
-    public init(directory: String) {
-        self.directory = directory
-    }
-}
-
-public struct TerminalCommandInput: Codable, Sendable {
+public struct TerminalInput: Codable, Sendable {
     public let command: String
-
-    public init(command: String) {
-        self.command = command
-    }
+    public let cwd: String?
 }
 
-public struct SearchEmailsInput: Codable, Sendable {
-    public let query: String
-
-    public init(query: String) {
-        self.query = query
-    }
+public struct MacScriptInput: Codable, Sendable {
+    public let language: String
+    public let source: String
 }
-
-public struct QueryNotionInput: Codable, Sendable {
-    public let query: String
-
-    public init(query: String) {
-        self.query = query
-    }
-}
-
-// MARK: - Native Aura Tools (OpenAgentSDK)
 
 public enum AuraTools {
-    /// Returns all native tools registered for Aura's in-process agent.
-    public static func allTools() -> [ToolProtocol] {
-        [
-            openApplicationTool,
-            adjustVolumeTool,
-            takeScreenshotTool,
-            listFilesTool,
-            executeTerminalCommandTool,
-            searchEmailsTool,
-            queryNotionTool
-        ]
-    }
+    public static func allTools() -> [ToolProtocol] { [computerTool, terminalTool, macScriptTool] }
 
-    // 1. Open Application
-    public static let openApplicationTool: ToolProtocol = defineTool(
-        name: "open_application",
-        description: "Opens or launches an installed macOS application on the user's computer.",
+    public static let computerTool: ToolProtocol = defineTool(
+        name: "computer",
+        description: "Controls the visible macOS UI. First call observe, then use only element_id values from that exact observation. Re-observe after every UI-changing action. Never invent element IDs.",
         inputSchema: [
             "type": "object",
             "properties": [
-                "app_name": [
-                    "type": "string",
-                    "description": "The exact or common name of the macOS application, e.g. Safari, Notes, Slack, Spotify, Terminal, Finder"
-                ]
-            ],
-            "required": ["app_name"]
-        ]
-    ) { (input: AppLauncherInput, _: ToolContext) async throws -> String in
-        let appName = input.app_name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !appName.isEmpty else {
-            return "Error: Missing app_name parameter."
-        }
-
-        do {
-            try await AppleScriptService.shared.openApp(named: appName)
-            return "Successfully opened \(appName)."
-        } catch {
-            let shellRes = try? await TerminalService.shared.execute(command: "open -a \"\(appName)\"")
-            if shellRes?.isSuccess == true {
-                return "Successfully opened \(appName)."
-            }
-            return "Failed to open \(appName): \(error.localizedDescription)"
-        }
-    }
-
-    // 2. Adjust Volume
-    public static let adjustVolumeTool: ToolProtocol = defineTool(
-        name: "adjust_volume",
-        description: "Adjusts the macOS system speaker audio output volume (up, down, mute, unmute).",
-        inputSchema: [
-            "type": "object",
-            "properties": [
-                "action": [
-                    "type": "string",
-                    "enum": ["up", "down", "mute", "unmute"],
-                    "description": "The volume adjustment action to take"
-                ]
+                "action": ["type": "string", "enum": ["observe", "click", "set_value", "press_key", "scroll", "screenshot"]],
+                "app_bundle_id": ["type": "string", "description": "Required for observe unless the frontmost app is intended, for example com.apple.TextEdit"],
+                "element_id": ["type": "string", "description": "An opaque ID returned by the newest observe response"],
+                "value": ["type": "string", "description": "Text for set_value"],
+                "keys": ["type": "array", "items": ["type": "string"], "description": "One key plus optional cmd, control, option, or shift modifiers"],
+                "direction": ["type": "string", "enum": ["up", "down", "left", "right"]],
+                "amount": ["type": "integer"]
             ],
             "required": ["action"]
-        ]
-    ) { (input: VolumeInput, _: ToolContext) async throws -> String in
-        let action = input.action.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-
-        do {
-            if action == "up" {
-                _ = try await AppleScriptService.shared.execute(script: "set volume output volume ((output volume of (get volume settings)) + 15)")
-                return "Volume increased by 15%."
-            } else if action == "down" {
-                _ = try await AppleScriptService.shared.execute(script: "set volume output volume ((output volume of (get volume settings)) - 15)")
-                return "Volume decreased by 15%."
-            } else if action == "mute" {
-                _ = try await AppleScriptService.shared.execute(script: "set volume with output muted")
-                return "System audio muted."
-            } else {
-                _ = try await AppleScriptService.shared.execute(script: "set volume without output muted")
-                return "System audio unmuted."
-            }
-        } catch {
-            return "Volume adjustment error: \(error.localizedDescription)"
-        }
-    }
-
-    // 3. Take Screenshot
-    public static let takeScreenshotTool: ToolProtocol = defineTool(
-        name: "take_screenshot",
-        description: "Takes a full-screen desktop screenshot and saves it as a PNG image file to the user's Desktop.",
-        inputSchema: [
-            "type": "object",
-            "properties": [:] as [String: Any]
-        ]
-    ) { (_: ToolContext) async throws -> String in
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let filename = "Screenshot_\(Int(Date().timeIntervalSince1970)).png"
-        let path = "\(home)/Desktop/\(filename)"
-        let res = try? await TerminalService.shared.execute(command: "screencapture \"\(path)\"")
-        if res?.isSuccess == true {
-            return "Captured screenshot and saved to Desktop: \(filename)"
-        }
-        return "Failed to capture screenshot."
-    }
-
-    // 4. List Files
-    public static let listFilesTool: ToolProtocol = defineTool(
-        name: "list_files",
-        description: "Lists files and subdirectories inside a specified folder on macOS.",
-        inputSchema: [
-            "type": "object",
-            "properties": [
-                "directory": [
-                    "type": "string",
-                    "description": "The directory path to inspect, e.g. ~/Desktop, ~/Downloads, or ~/Documents"
-                ]
-            ],
-            "required": ["directory"]
         ],
-        isReadOnly: true
-    ) { (input: ListFilesInput, _: ToolContext) async throws -> String in
-        let rawDir = input.directory.isEmpty ? "~/Desktop" : input.directory
-        let dir = (rawDir as NSString).expandingTildeInPath
-        let res = try? await TerminalService.shared.execute(command: "ls -1 \"\(dir)\" | head -n 15")
-        if let output = res?.stdout, !output.isEmpty {
-            return "Contents of \(rawDir):\n\(output.trimmingCharacters(in: .whitespacesAndNewlines))"
+        isReadOnly: false
+    ) { (input: ComputerInput, _: ToolContext) async throws -> String in
+        switch input.action.lowercased() {
+        case "observe":
+            let json = try ComputerControlService.shared.observe(appBundleId: input.app_bundle_id)
+            return "SUCCESS: Accessibility permission is active and working. UI observed successfully:\n\(json)"
+        case "click": return try ComputerControlService.shared.click(elementId: try required(input.element_id, named: "element_id"))
+        case "set_value": return try ComputerControlService.shared.setValue(
+            elementId: try required(input.element_id, named: "element_id"),
+            value: try required(input.value, named: "value")
+        )
+        case "press_key": return try ComputerControlService.shared.pressKeys(input.keys ?? [])
+        case "scroll": return try ComputerControlService.shared.scroll(direction: input.direction ?? "down", amount: input.amount ?? 3)
+        case "screenshot": return try ComputerControlService.shared.takeScreenshot()
+        default: throw AuraToolError.invalidAction(input.action)
         }
-        return "Folder \(rawDir) is empty or inaccessible."
     }
 
-    // 5. Execute Terminal Command
-    public static let executeTerminalCommandTool: ToolProtocol = defineTool(
-        name: "execute_terminal_command",
-        description: "Executes shell commands in zsh. Use this proactively to inspect installed programming languages, check package managers, or query system hardware.",
+    public static let terminalTool: ToolProtocol = defineTool(
+        name: "terminal",
+        description: "Runs a zsh command for local development and system work. Prefer direct read-only commands. Do not use terminal to run osascript; use mac_script so Aura can audit Apple Events.",
         inputSchema: [
             "type": "object",
             "properties": [
-                "command": [
-                    "type": "string",
-                    "description": "The shell command to execute, e.g. which python3, sw_vers, brew list --formula, date, uptime"
-                ]
+                "command": ["type": "string"],
+                "cwd": ["type": "string", "description": "Optional existing working directory"]
             ],
             "required": ["command"]
         ]
-    ) { (input: TerminalCommandInput, _: ToolContext) async throws -> String in
-        let cmd = input.command.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cmd.isEmpty else { return "Error: Empty command." }
-
-        let res = try? await TerminalService.shared.execute(command: cmd)
-        let out = (res?.stdout ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let err = (res?.stderr ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if !out.isEmpty {
-            return out
-        } else if !err.isEmpty {
-            return "Stderr: \(err)"
-        } else {
-            return "Command executed successfully with no output."
+    ) { (input: TerminalInput, _: ToolContext) async throws -> String in
+        let safety = GuardrailsEngine.shared.evaluateTool(name: "terminal", input: ["command": input.command])
+        if case .requiresConfirmation(let request) = safety {
+            let approved = await ApprovalCoordinator.shared.requestApproval(request: request)
+            guard approved else { throw AuraToolError.actionDenied("User cancelled action: \(request.title)") }
         }
+        let cwd = input.cwd.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        let result = try await TerminalService.shared.execute(command: input.command, currentDirectory: cwd)
+        let output = result.stdout.isEmpty ? result.stderr : result.stdout
+        return output.isEmpty ? "Command completed with no output." : output.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    // 6. Search Emails
-    public static let searchEmailsTool: ToolProtocol = defineTool(
-        name: "search_emails",
-        description: "Searches for recent emails in the user's Gmail inbox.",
+    public static let macScriptTool: ToolProtocol = defineTool(
+        name: "mac_script",
+        description: "Runs AppleScript or JavaScript for Automation (JXA) using the macOS automation system. Prefer it for apps with a scripting dictionary. Provide language as applescript or javascript.",
         inputSchema: [
             "type": "object",
             "properties": [
-                "query": [
-                    "type": "string",
-                    "description": "Email search query or sender name"
-                ]
+                "language": ["type": "string", "enum": ["applescript", "javascript"]],
+                "source": ["type": "string"]
             ],
-            "required": ["query"]
-        ],
-        isReadOnly: true
-    ) { (input: SearchEmailsInput, _: ToolContext) async throws -> String in
-        return "Found 0 unread emails matching '\(input.query)'. Gmail integration is active."
+            "required": ["language", "source"]
+        ]
+    ) { (input: MacScriptInput, _: ToolContext) async throws -> String in
+        let safety = GuardrailsEngine.shared.evaluateTool(name: "mac_script", input: ["source": input.source])
+        if case .requiresConfirmation(let request) = safety {
+            let approved = await ApprovalCoordinator.shared.requestApproval(request: request)
+            guard approved else { throw AuraToolError.actionDenied("User cancelled action: \(request.title)") }
+        }
+        return try await AppleScriptService.shared.execute(language: input.language, source: input.source)
     }
 
-    // 7. Query Notion
-    public static let queryNotionTool: ToolProtocol = defineTool(
-        name: "query_notion",
-        description: "Searches documents or database records in the connected Notion workspace.",
-        inputSchema: [
-            "type": "object",
-            "properties": [
-                "query": [
-                    "type": "string",
-                    "description": "Keywords or title of the Notion page"
-                ]
-            ],
-            "required": ["query"]
-        ],
-        isReadOnly: true
-    ) { (input: QueryNotionInput, _: ToolContext) async throws -> String in
-        return "Notion query '\(input.query)' completed. 0 pages updated."
+    private static func required(_ value: String?, named name: String) throws -> String {
+        guard let value, !value.isEmpty else { throw AuraToolError.missingArgument(name) }
+        return value
+    }
+}
+
+public enum AuraToolError: LocalizedError {
+    case invalidAction(String)
+    case missingArgument(String)
+    case actionDenied(String)
+    case confirmationRequired(ActionConfirmationRequest)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidAction(let action): return "Unsupported computer action: \(action)."
+        case .missingArgument(let name): return "Missing required argument: \(name)."
+        case .actionDenied(let reason): return reason
+        case .confirmationRequired(let request): return "Confirmation required: \(request.title). \(request.description)"
+        }
     }
 }

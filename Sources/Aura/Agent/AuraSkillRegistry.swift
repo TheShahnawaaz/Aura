@@ -13,38 +13,60 @@ public final class AuraSkillRegistry: @unchecked Sendable {
     }
 
     private func registerDomainSkills() {
-        // 1. System Control Skill
-        let systemControl = Skill(
-            name: "system_control",
-            description: "Controls macOS hardware and applications (volume, apps, screenshots)",
+        let macControl = Skill(
+            name: "mac_control",
+            description: "Uses accessibility UI control, AppleScript/JXA, and terminal tools to operate macOS safely",
+            userInvocable: true,
             promptTemplate: """
-            When the user wants to control their Mac (open an app, adjust speaker volume, take a screenshot),
-            use the respective native tools directly and provide concise, affirmative confirmation.
+            Choose the narrowest native capability that fits the request.
+            Use terminal for local shell and development work. Use mac_script for scriptable apps.
+            For visible UI, call computer.observe before acting; element IDs expire after every observation.
+            After each click, value change, keypress, or scroll, observe again and verify the intended result.
+            Never claim a UI action succeeded without a fresh observation. Do not use terminal to invoke osascript.
             """
         )
-        registry.register(systemControl)
+        registry.register(macControl)
 
-        // 2. Developer & Environment Inspection Skill
         let devInspection = Skill(
             name: "developer_inspection",
             description: "Proactively inspects files, shell environment, programming tools, and git status",
+            userInvocable: true,
             promptTemplate: """
-            When asked about development environment, code, files, or languages:
-            1. Proactively run non-destructive shell commands (`which`, `brew list`, `ls -1`, `sw_vers`, `uname -a`).
-            2. Inspect relevant directories before stating an answer.
-            3. Synthesize the findings into a clear, direct summary.
+            When asked about development environment, code, files, or languages, run non-destructive terminal commands and summarize the observed result.
             """
         )
         registry.register(devInspection)
 
-        // 3. Workspace Productivity Skill
         let productivity = Skill(
             name: "productivity",
-            description: "Searches Gmail and queries Notion databases",
+            description: "Automates productivity workflows, notes, reminders, and calendar tasks",
+            userInvocable: true,
             promptTemplate: """
-            Use query_notion and search_emails when the user refers to past notes, documents, or inbox messages.
+            Use native apps like Notes, Reminders, Calendar, and Safari to organize documents, tasks, and search.
             """
         )
         registry.register(productivity)
+
+        // Discover and register skills from filesystem directories
+        discoverExternalSkills()
+    }
+
+    private func discoverExternalSkills() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        var searchDirs = [
+            "\(home)/.aura/skills",
+            "\(home)/Library/Application Support/Aura/Skills"
+        ]
+        searchDirs.append(contentsOf: SkillLoader.defaultSkillDirectories())
+
+        let discovered = SkillLoader.discoverSkills(from: searchDirs)
+        for skill in discovered {
+            registry.register(skill)
+        }
+    }
+
+    /// Returns a list of all registered skill names and descriptions.
+    public func registeredSkillSummaries() -> [(name: String, description: String)] {
+        registry.allSkills.map { ($0.name, $0.description) }
     }
 }

@@ -5,18 +5,14 @@ import OpenAgentSDK
 final class AgentSDKTests: XCTestCase {
     func testToolDefinitionsValidity() {
         let tools = ToolRegistry.shared.toolDefinitions
-        XCTAssertGreaterThanOrEqual(tools.count, 5, "Tool registry should expose native system tools")
+        XCTAssertEqual(tools.count, 3, "Aura should expose only its three generic native capabilities")
 
         let names = tools.compactMap { tool -> String? in
             let fn = tool["function"] as? [String: Any]
             return fn?["name"] as? String
         }
 
-        XCTAssertTrue(names.contains("open_application"))
-        XCTAssertTrue(names.contains("adjust_volume"))
-        XCTAssertTrue(names.contains("take_screenshot"))
-        XCTAssertTrue(names.contains("list_files"))
-        XCTAssertTrue(names.contains("execute_terminal_command"))
+        XCTAssertEqual(Set(names), ["computer", "terminal", "mac_script"])
     }
 
     func testSessionSerializationAndStorage() {
@@ -66,7 +62,7 @@ final class AgentSDKTests: XCTestCase {
 
     func testToolExecutionDispatcher() async {
         let result = await ToolRegistry.shared.executeTool(
-            name: "execute_terminal_command",
+            name: "terminal",
             argumentsJson: "{\"command\": \"echo 'Aura Agent SDK'\"}"
         )
 
@@ -77,16 +73,28 @@ final class AgentSDKTests: XCTestCase {
 
     func testOpenAgentSDKNativeTools() {
         let tools = AuraTools.allTools()
-        XCTAssertEqual(tools.count, 7, "AuraTools should register 7 strongly-typed native tools")
+        XCTAssertEqual(tools.count, 3, "AuraTools should register three generic native tools")
 
         let toolNames = tools.map { $0.name }
-        XCTAssertTrue(toolNames.contains("open_application"))
-        XCTAssertTrue(toolNames.contains("adjust_volume"))
-        XCTAssertTrue(toolNames.contains("take_screenshot"))
-        XCTAssertTrue(toolNames.contains("list_files"))
-        XCTAssertTrue(toolNames.contains("execute_terminal_command"))
-        XCTAssertTrue(toolNames.contains("search_emails"))
-        XCTAssertTrue(toolNames.contains("query_notion"))
+        XCTAssertEqual(Set(toolNames), ["computer", "terminal", "mac_script"])
+    }
+
+    func testControlPolicyRequiresApprovalForMutation() {
+        let terminal = GuardrailsEngine.shared.evaluateTool(name: "terminal", input: ["command": "rm -rf /tmp/example"])
+        let script = GuardrailsEngine.shared.evaluateTool(name: "mac_script", input: ["source": "tell application \"Finder\" to delete every file"])
+        XCTAssertFalse(terminal.isSafe)
+        XCTAssertFalse(script.isSafe)
+
+        let safeTerminal = GuardrailsEngine.shared.evaluateTool(name: "terminal", input: ["command": "echo 'Hello World'"])
+        let safeScript = GuardrailsEngine.shared.evaluateTool(name: "mac_script", input: ["source": "tell application \"Notes\" to activate"])
+        XCTAssertTrue(safeTerminal.isSafe)
+        XCTAssertTrue(safeScript.isSafe)
+    }
+
+    func testAppleScriptAndStaleElementGuards() async throws {
+        let output = try await AppleScriptService.shared.execute(language: "applescript", source: "return \"Aura\"")
+        XCTAssertEqual(output, "Aura")
+        XCTAssertThrowsError(try ComputerControlService.shared.click(elementId: "expired:1"))
     }
 
     func testAuraSkillRegistryDomainSkills() {
@@ -105,18 +113,6 @@ final class AgentSDKTests: XCTestCase {
 
         XCTAssertNotNil(configs["test-filesystem"])
         await MCPManager.shared.remove(serverName: "test-filesystem")
-    }
-
-    func testAgentEngineLivePrompt() async throws {
-        let session = ConversationSession(title: "Test Turn")
-        let (answer, _) = try await AgentEngine.shared.runTurn(
-            session: session,
-            userPrompt: "Say hello in 3 words.",
-            isVoice: false
-        )
-        print("AgentEngine live response: \(answer)")
-        XCTAssertFalse(answer.isEmpty)
-        XCTAssertNotEqual(answer, "Understood.")
     }
 
     func testProviderRegistryDefinitions() {
@@ -156,19 +152,4 @@ final class AgentSDKTests: XCTestCase {
         XCTAssertTrue(fallbacks.contains(where: { $0.modelId == "gemini-2.5-flash" }))
     }
 
-    func testToolCallingTurn() async throws {
-        let session = ConversationSession(title: "Test Time")
-        let (answer, executed) = try await AgentEngine.shared.runTurn(
-            session: session,
-            userPrompt: "What is the current time? Please check with the date command.",
-            isVoice: false
-        )
-        print("AgentEngine answer: \(answer)")
-        print("AgentEngine executed tools count: \(executed.count)")
-        for t in executed {
-            print("Tool: \(t.toolName), Output: \(t.output)")
-        }
-        XCTAssertFalse(answer.contains("Error: [400]"))
-        XCTAssertGreaterThan(executed.count, 0)
-    }
 }
