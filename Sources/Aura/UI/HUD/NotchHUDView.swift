@@ -733,23 +733,43 @@ public struct NotchHUDView: View {
 
                     Spacer()
 
-                    // Right Action: ALWAYS Open Chat at the exact same location!
-                    Button {
-                        SettingsWindowController.shared.showChat()
-                        withAnimation {
-                            appState.resetToIdle()
+                    HStack(spacing: 9) {
+                        Button {
+                            if let delegate = AppDelegate.shared {
+                                delegate.cancelOrDiscardActiveEvent()
+                            } else {
+                                appState.resetToIdle()
+                            }
+                        } label: {
+                            Text("esc to cancel")
+                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.35))
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "bubble.left.and.bubble.right.fill")
-                                .font(.system(size: 8))
-                            Text("Open Chat")
-                                .font(.system(size: 9, weight: .medium, design: .rounded))
+                        .buttonStyle(.plain)
+                        .help("Discard current session (or press Esc)")
+
+                        Text("•")
+                            .font(.system(size: 7))
+                            .foregroundColor(.white.opacity(0.18))
+
+                        // Right Action: ALWAYS Open Chat at the exact same location!
+                        Button {
+                            SettingsWindowController.shared.showChat()
+                            withAnimation {
+                                appState.resetToIdle()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
+                                    .font(.system(size: 8))
+                                Text("Open Chat")
+                                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                            }
+                            .foregroundColor(.white.opacity(0.45))
                         }
-                        .foregroundColor(.white.opacity(0.45))
+                        .buttonStyle(.plain)
+                        .help("Open full chat thread in Aura Control Center")
                     }
-                    .buttonStyle(.plain)
-                    .help("Open full chat thread in Aura Control Center")
                 }
                 .frame(height: 16)
             }

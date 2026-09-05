@@ -76,6 +76,13 @@ public final class NativeSpeechRecognizer: @unchecked Sendable {
         recognitionTask = nil
     }
 
+    /// Cancels audio stream and discards any partial transcription immediately.
+    public func cancelRecognition() {
+        lock.lock()
+        defer { lock.unlock() }
+        cancelInternal()
+    }
+
     private func cancelInternal() {
         recognitionRequest?.endAudio()
         recognitionRequest = nil

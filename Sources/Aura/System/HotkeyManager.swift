@@ -73,12 +73,15 @@ public final class HotkeyManager: ObservableObject {
 
     public typealias HotkeyAction = @Sendable () -> Void
     private var onTrigger: HotkeyAction?
+    private var onEscape: HotkeyAction?
 
     @Published public private(set) var currentOption: HotkeyOption = .optionSpace
 
     private var hotKeyRef: EventHotKeyRef?
+    private var escapeHotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
     private var isHandlerInstalled: Bool = false
+    private var isEscapeArmed: Bool = false
 
     public init() {}
 
@@ -100,6 +103,41 @@ public final class HotkeyManager: ObservableObject {
     public func updateHotkey(_ option: HotkeyOption) {
         UserDefaults.standard.set(option.rawValue, forKey: "selectedHotkey")
         bindHotkey(option)
+    }
+
+    /// Dynamically arms the global Escape key (keyCode 53, 0 modifiers) to cancel/discard active listening or speaking.
+    public func armEscapeHotkey(action: @escaping HotkeyAction) {
+        self.onEscape = action
+        guard !isEscapeArmed else { return }
+
+        installCarbonHandlerIfNeeded()
+
+        let escapeHotKeyID = EventHotKeyID(signature: OSType(0x45534350), id: 2) // 'ESCP'
+        let status = RegisterEventHotKey(
+            UInt32(kVK_Escape),
+            0,
+            escapeHotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &escapeHotKeyRef
+        )
+
+        if status == noErr {
+            isEscapeArmed = true
+        } else {
+            NSLog("Aura: Failed to register Escape EventHotKey (status: %d)", status)
+        }
+    }
+
+    /// Disarms the global Escape key, immediately returning standard Escape key handling to macOS.
+    public func disarmEscapeHotkey() {
+        guard isEscapeArmed else { return }
+        if let ref = escapeHotKeyRef {
+            UnregisterEventHotKey(ref)
+            self.escapeHotKeyRef = nil
+        }
+        isEscapeArmed = false
+        self.onEscape = nil
     }
 
     private func bindHotkey(_ option: HotkeyOption) {
@@ -139,10 +177,24 @@ public final class HotkeyManager: ObservableObject {
         InstallEventHandler(
             GetApplicationEventTarget(),
             { (_, event, userData) -> OSStatus in
-                guard let userData else { return noErr }
+                guard let userData, let event else { return noErr }
+                var hotKeyID = EventHotKeyID()
+                let status = GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
                 let manager = Unmanaged<HotkeyManager>.fromOpaque(userData).takeUnretainedValue()
                 Task { @MainActor in
-                    manager.handleHotKey()
+                    if status == noErr && hotKeyID.id == 2 {
+                        manager.handleEscapeKey()
+                    } else {
+                        manager.handleHotKey()
+                    }
                 }
                 return noErr
             },
@@ -159,7 +211,12 @@ public final class HotkeyManager: ObservableObject {
         onTrigger?()
     }
 
+    private func handleEscapeKey() {
+        onEscape?()
+    }
+
     public func unregister() {
+        disarmEscapeHotkey()
         if let hotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             self.hotKeyRef = nil

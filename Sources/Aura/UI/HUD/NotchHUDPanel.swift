@@ -56,15 +56,18 @@ public final class NotchHUDPanel: NSPanel {
     private var clickAwayMonitor: Any? = nil
     private var escapeLocalMonitor: Any? = nil
     private var escapeGlobalMonitor: Any? = nil
+    private var isMonitoringActive: Bool = false
 
     private func setupDismissalMonitors(appState: AppState) {
-        appState.$isTurnCompletedPresented
+        Publishers.CombineLatest(appState.$state, appState.$isTurnCompletedPresented)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] isPresented in
-                if isPresented {
-                    self?.startDismissalMonitors(appState: appState)
-                } else {
-                    self?.stopDismissalMonitors()
+            .sink { [weak self] state, isTurnCompleted in
+                guard let self = self else { return }
+                let shouldMonitor = (state != .idle) || isTurnCompleted
+                if shouldMonitor && !self.isMonitoringActive {
+                    self.startDismissalMonitors(appState: appState)
+                } else if !shouldMonitor && self.isMonitoringActive {
+                    self.stopDismissalMonitors()
                 }
             }
             .store(in: &cancellables)
@@ -72,12 +75,30 @@ public final class NotchHUDPanel: NSPanel {
 
     private func startDismissalMonitors(appState: AppState) {
         stopDismissalMonitors()
+        isMonitoringActive = true
 
-        // 1. Global click-away: detect click outside the Notch
+        // 1. Carbon Global HotKey: Instantly intercepts Escape system-wide without requiring Accessibility privileges
+        HotkeyManager.shared.armEscapeHotkey {
+            Task { @MainActor in
+                if let delegate = AppDelegate.shared {
+                    delegate.cancelOrDiscardActiveEvent()
+                } else {
+                    SpeechSynthesizer.shared.stopSpeaking()
+                    AudioCaptureService.shared.stopCapture()
+                    NativeSpeechRecognizer.shared.cancelRecognition()
+                    AudioDuckingManager.shared.unduckMedia()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        appState.resetToIdle()
+                    }
+                }
+            }
+        }
+
+        // 2. Click-away: detect click outside the Notch when inspecting completed turn
         clickAwayMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self = self else { return }
+            guard appState.state == .idle, appState.isTurnCompletedPresented else { return }
             let clickLocation = NSEvent.mouseLocation
-            // If click occurs outside the notch HUD window frame
             if !self.frame.contains(clickLocation) {
                 Task { @MainActor in
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -87,32 +108,49 @@ public final class NotchHUDPanel: NSPanel {
             }
         }
 
-        // 2. Global Escape key detection
+        // 3. Global Escape key observer (passive monitor across all applications)
         escapeGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
             if event.keyCode == 53 { // ESC key
                 Task { @MainActor in
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        appState.dismissTurnCompleted()
+                    if let delegate = AppDelegate.shared {
+                        delegate.cancelOrDiscardActiveEvent()
+                    } else {
+                        SpeechSynthesizer.shared.stopSpeaking()
+                        AudioCaptureService.shared.stopCapture()
+                        NativeSpeechRecognizer.shared.cancelRecognition()
+                        AudioDuckingManager.shared.unduckMedia()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            appState.resetToIdle()
+                        }
                     }
                 }
             }
         }
 
-        // 3. Local Escape key detection
+        // 4. Local Escape key detection (when Aura HUD or Settings window is key/active)
         escapeLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            if event.keyCode == 53 {
+            if event.keyCode == 53 { // ESC key
                 Task { @MainActor in
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        appState.dismissTurnCompleted()
+                    if let delegate = AppDelegate.shared {
+                        delegate.cancelOrDiscardActiveEvent()
+                    } else {
+                        SpeechSynthesizer.shared.stopSpeaking()
+                        AudioCaptureService.shared.stopCapture()
+                        NativeSpeechRecognizer.shared.cancelRecognition()
+                        AudioDuckingManager.shared.unduckMedia()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            appState.resetToIdle()
+                        }
                     }
                 }
-                return nil
+                return nil // Swallow event locally to prevent system alert beep
             }
             return event
         }
     }
 
     private func stopDismissalMonitors() {
+        HotkeyManager.shared.disarmEscapeHotkey()
         if let monitor = clickAwayMonitor {
             NSEvent.removeMonitor(monitor)
             clickAwayMonitor = nil
@@ -125,6 +163,7 @@ public final class NotchHUDPanel: NSPanel {
             NSEvent.removeMonitor(monitor)
             escapeLocalMonitor = nil
         }
+        isMonitoringActive = false
     }
 
     override public var canBecomeKey: Bool { false }

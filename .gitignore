@@ -1,10 +1,12 @@
 # Swift Package Manager & Build Artifacts
 .build/
+.build_*/
 build/
 DerivedData/
 .swiftpm/
 
-# Local Experiments & Scratch
+# Local Multi-Agent Workspaces, Experiments & Scratch
+.agents/
 .experiments/
 PLAN.md
 

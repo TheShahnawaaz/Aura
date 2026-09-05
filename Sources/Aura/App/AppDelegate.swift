@@ -5,6 +5,8 @@ import Combine
 /// Application delegate managing the macOS life cycle, Dock presence, and global hotkeys.
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate {
+    public static private(set) weak var shared: AppDelegate?
+
     public private(set) var hudPanel: NotchHUDPanel?
     public private(set) var settingsController: SettingsWindowController?
     public private(set) var statusBarController: StatusBarController?
@@ -19,7 +21,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dockAnimationTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
 
+    public override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
+
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared = self
         // Register URLProtocol to transparently preserve Google Gemini thought signatures
         GeminiThoughtSignatureProtocol.register()
 
@@ -154,6 +162,45 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             audioCapture.stopCapture()
             speechRecognizer.stopRecognition()
             appState.resetToIdle()
+        }
+    }
+
+    /// Immediately discards or closes any in-progress listening or speaking session, or active modal/HUD event.
+    public func cancelOrDiscardActiveEvent() {
+        silenceTask?.cancel()
+        silenceTask = nil
+
+        switch appState.state {
+        case .listening:
+            audioCapture.stopCapture()
+            speechRecognizer.cancelRecognition()
+            AudioDuckingManager.shared.unduckMedia()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                appState.resetToIdle()
+            }
+
+        case .speaking:
+            speechSynthesizer.stopSpeaking()
+            AudioDuckingManager.shared.unduckMedia()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                appState.resetToIdle()
+            }
+
+        case .processing, .awaitingConfirmation, .error:
+            audioCapture.stopCapture()
+            speechRecognizer.cancelRecognition()
+            speechSynthesizer.stopSpeaking()
+            AudioDuckingManager.shared.unduckMedia()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                appState.resetToIdle()
+            }
+
+        case .idle:
+            if appState.isTurnCompletedPresented {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    appState.dismissTurnCompleted()
+                }
+            }
         }
     }
 
