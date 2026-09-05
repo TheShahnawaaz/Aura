@@ -9,6 +9,10 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
     private let synthesizer = AVSpeechSynthesizer()
     @Published public var isSpeaking: Bool = false
 
+    private var envelopeTask: Task<Void, Never>? = nil
+    private var targetLevel: Float = 0.0
+    private var currentLevel: Float = 0.0
+
     private override init() {
         super.init()
         synthesizer.delegate = self
@@ -47,6 +51,7 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
         AppState.shared.state = .speaking(text: text)
         AudioDuckingManager.shared.duckMedia()
 
+        startEnvelopeTracking()
         synthesizer.speak(utterance)
     }
 
@@ -56,17 +61,74 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
             synthesizer.stopSpeaking(at: .immediate)
         }
         isSpeaking = false
+        stopEnvelopeTracking()
         AudioDuckingManager.shared.unduckMedia()
     }
 
+    // MARK: - Dynamic Vocal Envelope Modulation
+    private func startEnvelopeTracking() {
+        envelopeTask?.cancel()
+        currentLevel = 0.0
+        targetLevel = 0.0
+        envelopeTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 33_000_000) // ~30 FPS
+                guard let self = self, self.isSpeaking else { break }
+
+                // Smooth exponential glide towards target level
+                let smoothing: Float = 0.32
+                self.currentLevel += (self.targetLevel - self.currentLevel) * smoothing
+
+                // Natural cadence decay if target is sustained
+                if self.targetLevel > 0.04 {
+                    self.targetLevel = max(0.04, self.targetLevel * 0.91)
+                }
+
+                AppState.shared.audioLevel = self.currentLevel
+            }
+            AppState.shared.audioLevel = 0.0
+        }
+    }
+
+    private func stopEnvelopeTracking() {
+        envelopeTask?.cancel()
+        envelopeTask = nil
+        currentLevel = 0.0
+        targetLevel = 0.0
+        AppState.shared.audioLevel = 0.0
+    }
+
     public nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, willSpeakRangeOfSpeechString characterRange: NSRange, utterance: AVSpeechUtterance) {
+        let fullString = utterance.speechString as NSString
+        let wordLength = characterRange.length
+        let nextIndex = characterRange.location + characterRange.length
+
+        var hasPunctuationPause = false
+        if nextIndex < fullString.length {
+            let checkLen = min(3, fullString.length - nextIndex)
+            let snippet = fullString.substring(with: NSRange(location: nextIndex, length: checkLen))
+            for char in snippet {
+                if char == "," || char == "." || char == "?" || char == "!" || char == ";" || char == "—" {
+                    hasPunctuationPause = true
+                    break
+                }
+            }
+        }
+
+        // Fast intensity calculation
+        let clampedLen = Float(min(12, max(1, wordLength)))
+        let intensity: Float = min(0.92, 0.40 + (clampedLen * 0.05))
+
         Task { @MainActor in
-            let wordLength = Float(characterRange.length)
-            let intensity = min(1.0, max(0.40, wordLength * 0.12))
-            AppState.shared.audioLevel = intensity
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                if case .speaking = AppState.shared.state {
-                    AppState.shared.audioLevel = 0.22
+            guard self.isSpeaking else { return }
+            self.targetLevel = intensity
+
+            if hasPunctuationPause {
+                let delay = max(0.16, Double(clampedLen) * 0.05)
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    if self?.isSpeaking == true {
+                        self?.targetLevel = 0.02
+                    }
                 }
             }
         }
@@ -75,7 +137,7 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
     public nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
             self.isSpeaking = false
-            AppState.shared.audioLevel = 0.0
+            self.stopEnvelopeTracking()
             AudioDuckingManager.shared.unduckMedia()
             if case .speaking = AppState.shared.state {
                 AppState.shared.completeSpeakingAndPresent()
@@ -86,7 +148,7 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
     public nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         Task { @MainActor in
             self.isSpeaking = false
-            AppState.shared.audioLevel = 0.0
+            self.stopEnvelopeTracking()
             AudioDuckingManager.shared.unduckMedia()
         }
     }

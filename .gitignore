@@ -45,3 +45,6 @@ web/out/
 web/.turbo/
 web/.vercel/
 *.tsbuildinfo
+
+# Agent Skills Lock
+skills-lock.json

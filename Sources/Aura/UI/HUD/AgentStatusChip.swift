@@ -42,9 +42,15 @@ public struct AgentStatusChip: View {
                 )
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.white.opacity(0.12))
-        .clipShape(Capsule())
+        .padding(.vertical, 3.5)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.08))
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.14), lineWidth: 0.5)
+        )
         .onAppear {
             if agent.status == .running {
                 isPulsing = true
