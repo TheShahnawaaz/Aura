@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Appearance and HUD customization section.
+/// Appearance and HUD customization section styled with obsidian liquid-glass design.
 public struct AppearanceSettingsView: View {
     @ObservedObject public var appState: AppState
     @StateObject private var geometry = NotchGeometry()
@@ -14,114 +14,152 @@ public struct AppearanceSettingsView: View {
     }
 
     public var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
                 // Header
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Appearance & Display")
-                        .font(.title2.weight(.bold))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                     Text("Hardware notch calibration, glassmorphism material finish, and ambient lighting.")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.6))
                 }
 
                 // 1. Hardware Calibration & Positioning Card
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Label("MacBook Notch Calibration", systemImage: "macbook.gen2")
-                            .font(.headline)
-                        Spacer()
-                        Text(geometry.hasNotch ? "Hardware Notch Detected" : "Floating Pill Mode")
-                            .font(.caption2.weight(.semibold))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2.5)
-                            .background(Color.blue.opacity(0.15))
-                            .foregroundColor(.blue)
-                            .cornerRadius(4)
-                    }
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentIndigo.opacity(0.2))
+                                    .frame(width: 28, height: 28)
 
-                    Divider()
+                                Image(systemName: "macbook.gen2")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentIndigo)
+                            }
 
-                    VStack(spacing: 8) {
-                        metricRow(label: "Screen Dimensions", value: "\(Int(geometry.screenFrame.width)) × \(Int(geometry.screenFrame.height)) pt")
-                        metricRow(label: "Physical Notch Width", value: "\(Int(geometry.notchWidth)) pt")
-                        metricRow(label: "Hardware Notch Center X", value: String(format: "%.1f pt", geometry.notchCenterX))
-                        metricRow(label: "HUD Constant Cap Width", value: "\(Int(geometry.closedWidth)) pt")
-                        metricRow(label: "Alignment Status", value: "Subpixel Centered & Bezel-Flush")
+                            Text("MacBook Notch Calibration")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            Spacer()
+
+                            Text(geometry.hasNotch ? "Hardware Notch Detected" : "Floating Pill Mode")
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2.5)
+                                .background(ControlCenterTokens.Colors.accentIndigo.opacity(0.25))
+                                .foregroundColor(ControlCenterTokens.Colors.accentIndigo)
+                                .cornerRadius(4)
+                        }
+
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
+
+                        VStack(spacing: 8) {
+                            metricRow(label: "Screen Dimensions", value: "\(Int(geometry.screenFrame.width)) × \(Int(geometry.screenFrame.height)) pt")
+                            metricRow(label: "Physical Notch Width", value: "\(Int(geometry.notchWidth)) pt")
+                            metricRow(label: "Hardware Notch Center X", value: String(format: "%.1f pt", geometry.notchCenterX))
+                            metricRow(label: "HUD Constant Cap Width", value: "\(Int(geometry.closedWidth)) pt")
+                            metricRow(label: "Alignment Status", value: "Subpixel Centered & Bezel-Flush")
+                        }
                     }
                 }
-                .padding(16)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
 
                 // 2. Visual Effects & Glassmorphism
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Visual Polish & Effects", systemImage: "sparkles")
-                        .font(.headline)
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentPurple.opacity(0.2))
+                                    .frame(width: 28, height: 28)
 
-                    Divider()
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentPurple)
+                            }
 
-                    Toggle("Enable ambient breathing glow on status indicator dot", isOn: $enableAmbientGlow)
-                        .toggleStyle(.switch)
+                            Text("Visual Polish & Effects")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
 
-                    Toggle("Enable tactile sound / haptic feedback on submission", isOn: $enableHapticFeedback)
-                        .toggleStyle(.switch)
+                            Spacer()
+                        }
 
-                    HStack {
-                        Text("HUD Backdrop Finish:")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("Apple Glassmorphism (.ultraThinMaterial + 88% Jet Black)")
-                            .font(.subheadline.weight(.medium))
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
+
+                        Toggle("Enable ambient breathing glow on status indicator dot", isOn: $enableAmbientGlow)
+                            .toggleStyle(.switch)
+                            .foregroundColor(.white.opacity(0.9))
+
+                        Toggle("Enable tactile sound / haptic feedback on submission", isOn: $enableHapticFeedback)
+                            .toggleStyle(.switch)
+                            .foregroundColor(.white.opacity(0.9))
+
+                        HStack {
+                            Text("HUD Backdrop Finish:")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.6))
+                            Spacer()
+                            Text("Apple Glassmorphism (.ultraThinMaterial + 88% Jet Black)")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.85))
+                        }
                     }
                 }
-                .padding(16)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
 
                 // 3. Living Aurora Orb & Dock Icon Card
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Living Aurora Orb & Dock Icon", systemImage: "sparkles")
-                        .font(.headline)
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentCyan.opacity(0.2))
+                                    .frame(width: 28, height: 28)
 
-                    Divider()
-
-                    Toggle("Enable live interactive animation in macOS Dock icon", isOn: $enableLiveDockIcon)
-                        .toggleStyle(.switch)
-                        .onChange(of: enableLiveDockIcon) { _, _ in
-                            if let delegate = NSApplication.shared.delegate as? AppDelegate {
-                                delegate.refreshDockTile()
+                                Image(systemName: "app.dashed")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentCyan)
                             }
+
+                            Text("Living Aurora Orb & Dock Icon")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            Spacer()
                         }
 
-                    HStack(spacing: 16) {
-                        LivingAuroraOrbView(appState: appState, size: 52, showSquircleBackground: true)
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Tactile Iridescent Glass Sphere")
-                                .font(.subheadline.weight(.semibold))
-                            Text("Real-time voice-reactive fluid animations across Idle, Listening, Processing, and Speaking states.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        Toggle("Enable live interactive animation in macOS Dock icon", isOn: $enableLiveDockIcon)
+                            .toggleStyle(.switch)
+                            .foregroundColor(.white.opacity(0.9))
+                            .onChange(of: enableLiveDockIcon) { _, _ in
+                                if let delegate = NSApplication.shared.delegate as? AppDelegate {
+                                    delegate.refreshDockTile()
+                                }
+                            }
+
+                        HStack(spacing: 16) {
+                            LivingAuroraOrbView(appState: appState, size: 48, showSquircleBackground: false)
+                                .shadow(color: ControlCenterTokens.Colors.accentIndigo.opacity(0.3), radius: 10)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Tactile Iridescent Glass Sphere")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                                Text("Real-time voice-reactive fluid animations across Idle, Listening, Processing, and Speaking states.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.55))
+                            }
                         }
                     }
                 }
-                .padding(16)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
             }
             .padding(24)
         }
@@ -130,12 +168,12 @@ public struct AppearanceSettingsView: View {
     private func metricRow(label: String, value: String) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.55))
             Spacer()
             Text(value)
-                .font(.subheadline.weight(.medium).monospacedDigit())
-                .foregroundColor(.primary)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.9))
         }
     }
 }

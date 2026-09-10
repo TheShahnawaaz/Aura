@@ -83,7 +83,7 @@ public enum AuraTools {
         let cap = try ComputerControlService.shared.captureScreenshotData()
         return ToolExecuteResult(
             typedContent: [
-                .text("Screenshot captured successfully (\(cap.width)x\(cap.height)). Saved to \(cap.path). Visual pixels attached below:"),
+                .text("Screenshot captured successfully (\(cap.width)x\(cap.height)). Saved to \(cap.path)."),
                 .image(data: cap.data, mimeType: cap.mimeType)
             ],
             isError: false
@@ -141,7 +141,7 @@ public enum AuraTools {
             let cap = try ComputerControlService.shared.captureScreenshotData()
             return ToolExecuteResult(
                 typedContent: [
-                    .text("Screenshot captured successfully (\(cap.width)x\(cap.height)). Saved to \(cap.path). Visual pixels attached below:"),
+                    .text("Screenshot captured successfully (\(cap.width)x\(cap.height)). Saved to \(cap.path)."),
                     .image(data: cap.data, mimeType: cap.mimeType)
                 ],
                 isError: false
@@ -237,7 +237,7 @@ public enum AuraTools {
 
         return ToolExecuteResult(
             typedContent: [
-                .text("Loaded image: \(resolvedPath) (\(originalWidth)x\(originalHeight)). Visual pixels attached below:"),
+                .text("Loaded image: \(resolvedPath) (\(originalWidth)x\(originalHeight))."),
                 .image(data: data, mimeType: "image/jpeg")
             ],
             isError: false

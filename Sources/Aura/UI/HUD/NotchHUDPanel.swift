@@ -85,7 +85,7 @@ public final class NotchHUDPanel: NSPanel {
                 } else {
                     SpeechSynthesizer.shared.stopSpeaking()
                     AudioCaptureService.shared.stopCapture()
-                    NativeSpeechRecognizer.shared.cancelRecognition()
+                    SpeechRecognitionRouter.shared.cancelRecognition()
                     AudioDuckingManager.shared.unduckMedia()
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         appState.resetToIdle()
@@ -117,7 +117,7 @@ public final class NotchHUDPanel: NSPanel {
                     } else {
                         SpeechSynthesizer.shared.stopSpeaking()
                         AudioCaptureService.shared.stopCapture()
-                        NativeSpeechRecognizer.shared.cancelRecognition()
+                        SpeechRecognitionRouter.shared.cancelRecognition()
                         AudioDuckingManager.shared.unduckMedia()
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                             appState.resetToIdle()
@@ -136,7 +136,7 @@ public final class NotchHUDPanel: NSPanel {
                     } else {
                         SpeechSynthesizer.shared.stopSpeaking()
                         AudioCaptureService.shared.stopCapture()
-                        NativeSpeechRecognizer.shared.cancelRecognition()
+                        SpeechRecognitionRouter.shared.cancelRecognition()
                         AudioDuckingManager.shared.unduckMedia()
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                             appState.resetToIdle()

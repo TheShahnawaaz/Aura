@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shortcuts and triggers configuration section.
+/// Shortcuts and triggers configuration section styled with obsidian liquid-glass.
 public struct ShortcutsSettingsView: View {
     @ObservedObject public var appState: AppState
 
@@ -13,106 +13,119 @@ public struct ShortcutsSettingsView: View {
     }
 
     public var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
                 // Header
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Triggers & Shortcuts")
-                        .font(.title2.weight(.bold))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                     Text("Configure system-wide hotkeys, voice activation triggers, and silence auto-submission.")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.6))
                 }
 
-                hotkeyCard
+                // Global Hotkey Card
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentEmerald.opacity(0.2))
+                                    .frame(width: 28, height: 28)
 
-                voiceBehaviorCard
+                                Image(systemName: "keyboard.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentEmerald)
+                            }
+
+                            Text("Global System Hotkey")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            Spacer()
+
+                            ControlCenterKeycapView(appState.hotkeyDisplayString, fontSize: 12)
+                        }
+
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("KEYBOARD SHORTCUT")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.45))
+
+                            Picker("", selection: $selectedHotkey) {
+                                ForEach(HotkeyOption.allCases) { (opt: HotkeyOption) in
+                                    Text(opt.displayName).tag(opt.rawValue)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 320, alignment: .leading)
+                            .onChange(of: selectedHotkey) { _, newValue in
+                                if let option = HotkeyOption(rawValue: newValue) {
+                                    HotkeyManager.shared.updateHotkey(option)
+                                }
+                            }
+                        }
+
+                        Text("Press this hotkey anywhere in macOS to trigger the Notch HUD. Press it again to submit your voice command or barge in while speaking.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.55))
+                    }
+                }
+
+                // Voice Submission Behavior Card
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentAmber.opacity(0.2))
+                                    .frame(width: 28, height: 28)
+
+                                Image(systemName: "timer")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentAmber)
+                            }
+
+                            Text("Voice Submission Behavior")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            Spacer()
+                        }
+
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
+
+                        Toggle("Automatically submit when speech finishes (Silence Detection)", isOn: $autoSubmitOnSilence)
+                            .toggleStyle(.switch)
+                            .foregroundColor(.white.opacity(0.9))
+
+                        if autoSubmitOnSilence {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("SILENCE THRESHOLD")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.white.opacity(0.45))
+                                    Spacer()
+                                    Text(String(format: "%.1f seconds", silenceDuration))
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.white)
+                                }
+                                Slider(value: $silenceDuration, in: 0.8...3.5, step: 0.1)
+                            }
+
+                            Text("Aura will automatically stop listening and send your prompt after detecting continuous silence.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                }
             }
             .padding(24)
         }
-    }
-
-    // MARK: - Subviews
-    private var hotkeyCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Label("Global Hotkey", systemImage: "keyboard")
-                    .font(.headline)
-                Spacer()
-                Text(appState.hotkeyDisplayString)
-                    .font(.system(.subheadline, design: .monospaced).weight(.bold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.blue.opacity(0.15))
-                    .foregroundColor(.blue)
-                    .cornerRadius(6)
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Keyboard Shortcut")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Picker("", selection: $selectedHotkey) {
-                    ForEach(HotkeyOption.allCases) { (opt: HotkeyOption) in
-                        Text(opt.displayName).tag(opt.rawValue)
-                    }
-                }
-                .onChange(of: selectedHotkey) { _, newValue in
-                    if let option = HotkeyOption(rawValue: newValue) {
-                        HotkeyManager.shared.updateHotkey(option)
-                    }
-                }
-            }
-
-            Text("Press this hotkey anywhere in macOS to trigger the Notch HUD. Press it again to submit your voice command or barge in while speaking.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(16)
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    private var voiceBehaviorCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Voice Submission Behavior", systemImage: "timer")
-                .font(.headline)
-
-            Divider()
-
-            Toggle("Automatically submit when speech finishes (Silence Detection)", isOn: $autoSubmitOnSilence)
-                .toggleStyle(.switch)
-
-            if autoSubmitOnSilence {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Silence Threshold:")
-                            .font(.subheadline)
-                        Spacer()
-                        Text(String(format: "%.1f seconds", silenceDuration))
-                            .font(.subheadline.weight(.semibold).monospacedDigit())
-                    }
-                    Slider(value: $silenceDuration, in: 1.0...3.5, step: 0.2)
-                }
-            } else {
-                Text("Manual Mode: Press your hotkey to start speaking, and press it again when finished to submit.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(16)
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        )
     }
 }

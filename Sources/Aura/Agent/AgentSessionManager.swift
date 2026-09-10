@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import OpenAgentSDK
 
 /// Central coordinator for multi-turn chat sessions, disk persistence, and ReAct agent execution.
 @MainActor
@@ -90,9 +91,15 @@ public final class AgentSessionManager: ObservableObject {
     /// Submits a user prompt.
     /// If an existing chat is selected, appends to it. If nothing is selected, starts a fresh new chat.
     @discardableResult
-    public func processPrompt(text: String, isVoice: Bool) async -> String {
+    public func processPrompt(
+        text: String,
+        isVoice: Bool,
+        imagePaths: [String]? = nil,
+        userImages: [UserImageAttachment] = []
+    ) async -> String {
         let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanText.isEmpty else { return "" }
+        let effectiveText = cleanText.isEmpty && !(imagePaths?.isEmpty ?? true) ? "What is in this image?" : cleanText
+        guard !effectiveText.isEmpty else { return "" }
 
         isProcessing = true
 
@@ -110,7 +117,7 @@ public final class AgentSessionManager: ObservableObject {
         }
 
         // 2. Append user message
-        let userMsg = ChatMessage(role: .user, content: cleanText, isVoice: isVoice)
+        let userMsg = ChatMessage(role: .user, content: effectiveText, isVoice: isVoice, imagePaths: imagePaths)
         targetSession.messages.append(userMsg)
 
         // 3. Immediately append initial assistant placeholder message for real-time progressive streaming
@@ -135,15 +142,16 @@ public final class AgentSessionManager: ObservableObject {
         do {
             let result = try await AgentEngine.shared.runTurn(
                 session: targetSession,
-                userPrompt: cleanText,
+                userPrompt: effectiveText,
                 isVoice: isVoice,
+                userImages: userImages,
                 onPhaseUpdate: { phase in
-                    Task { @MainActor in
+                    _Concurrency.Task { @MainActor in
                         AppState.shared.state = .processing(phase: phase)
                     }
                 },
                 onInterimText: { text in
-                    Task { @MainActor in
+                    _Concurrency.Task { @MainActor in
                         guard let sIdx = self.sessions.firstIndex(where: { $0.id == targetSession.id }),
                               let mIdx = self.sessions[sIdx].messages.firstIndex(where: { $0.id == assistantMessageId }) else { return }
                         self.sessions[sIdx].messages[mIdx].content = text
@@ -153,7 +161,7 @@ public final class AgentSessionManager: ObservableObject {
                     }
                 },
                 onToolStart: { record in
-                    Task { @MainActor in
+                    _Concurrency.Task { @MainActor in
                         guard let sIdx = self.sessions.firstIndex(where: { $0.id == targetSession.id }),
                               let mIdx = self.sessions[sIdx].messages.firstIndex(where: { $0.id == assistantMessageId }) else { return }
                         self.sessions[sIdx].messages[mIdx].toolCalls.append(record)
@@ -163,7 +171,7 @@ public final class AgentSessionManager: ObservableObject {
                     }
                 },
                 onToolFinish: { record in
-                    Task { @MainActor in
+                    _Concurrency.Task { @MainActor in
                         guard let sIdx = self.sessions.firstIndex(where: { $0.id == targetSession.id }),
                               let mIdx = self.sessions[sIdx].messages.firstIndex(where: { $0.id == assistantMessageId }) else { return }
                         if let tIdx = self.sessions[sIdx].messages[mIdx].toolCalls.firstIndex(where: { $0.id == record.id || ($0.toolName == record.toolName && $0.status == .running) }) {
@@ -216,7 +224,7 @@ public final class AgentSessionManager: ObservableObject {
         // 6. Auto-titling if this is a newly created thread
         if targetSession.title == "New Conversation" && targetSession.messages.count <= 2 {
             let sessionToTitle = targetSession.id
-            Task.detached(priority: .utility) {
+            _Concurrency.Task.detached(priority: .utility) {
                 let aiTitle = await LLMService.shared.generateTitle(for: cleanText)
                 await MainActor.run {
                     self.renameSession(id: sessionToTitle, newTitle: aiTitle)

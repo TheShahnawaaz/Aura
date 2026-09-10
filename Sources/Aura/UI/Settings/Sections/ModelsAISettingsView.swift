@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Models & AI settings section for managing LLM providers, dynamic model discovery,
-/// API credentials, and inference parameters.
+/// API credentials, and inference parameters, styled with the obsidian liquid-glass system.
 public struct ModelsAISettingsView: View {
     @AppStorage("selectedProvider") private var selectedProvider: String = "Google Gemini"
     @AppStorage("selectedModel") private var selectedModel: String = "gemini-2.5-flash"
@@ -31,263 +31,328 @@ public struct ModelsAISettingsView: View {
     }
 
     public var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 20) {
                 // Header
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Models & Intelligence")
-                        .font(.title2.weight(.bold))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                     Text("Select your preferred AI provider, manage API credentials, and tune response parameters.")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.6))
                 }
 
                 // 1. Provider & Model Card
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("AI Engine Selection", systemImage: "brain")
-                        .font(.headline)
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentPurple.opacity(0.2))
+                                    .frame(width: 28, height: 28)
 
-                    Divider()
-
-                    // Provider Picker
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Active Provider")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        Picker("", selection: $selectedProvider) {
-                            ForEach(ProviderRegistry.shared.providers) { p in
-                                Text(p.displayName).tag(p.displayName)
+                                Image(systemName: "brain")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentPurple)
                             }
-                        }
-                        .pickerStyle(.menu)
-                        .frame(maxWidth: 320, alignment: .leading)
-                        .onChange(of: selectedProvider) { _, newProvider in
-                            let newConfig = ProviderRegistry.shared.find(idOrName: newProvider)
-                            // 1. Switch default model to new provider
-                            selectedModel = newConfig.defaultModel
 
-                            // 2. Sniff ONLY this provider's environment variables
-                            let env = ProcessInfo.processInfo.environment
-                            for varName in newConfig.envVarNames {
-                                if let val = env[varName], !val.isEmpty {
-                                    populateKeyField(for: newConfig.providerId, key: val)
-                                    break
+                            Text("AI Engine Selection")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            Spacer()
+                        }
+
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
+
+                        // Provider Picker
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("ACTIVE PROVIDER")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.45))
+
+                            Picker("", selection: $selectedProvider) {
+                                ForEach(ProviderRegistry.shared.providers) { p in
+                                    Text(p.displayName).tag(p.displayName)
                                 }
                             }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 320, alignment: .leading)
+                            .onChange(of: selectedProvider) { _, newProvider in
+                                let newConfig = ProviderRegistry.shared.find(idOrName: newProvider)
+                                selectedModel = newConfig.defaultModel
 
-                            Task {
-                                await refreshModels()
-                            }
-                        }
-                    }
+                                let env = ProcessInfo.processInfo.environment
+                                for varName in newConfig.envVarNames {
+                                    if let val = env[varName], !val.isEmpty {
+                                        populateKeyField(for: newConfig.providerId, key: val)
+                                        break
+                                    }
+                                }
 
-                    // Dynamic Model Dropdown
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text("Model (Chat & Tool Calling)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            if isLoadingModels {
-                                ProgressView()
-                                    .scaleEffect(0.6)
-                                    .frame(width: 14, height: 14)
-                            }
-                            Button {
                                 Task {
                                     await refreshModels()
                                 }
-                            } label: {
-                                Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
                             }
-                            .buttonStyle(.plain)
-                            .help("Refresh available models from provider API")
                         }
 
-                        if activeConfig.providerId == "custom" && availableModels.isEmpty {
-                            TextField("Model name (e.g. llama3.2, mistral)", text: $customModelName)
-                                .textFieldStyle(.roundedBorder)
-                        } else {
-                            Picker("", selection: $selectedModel) {
-                                ForEach(availableModels) { model in
-                                    Text(model.displayName).tag(model.modelId)
-                                }
-                            }
-                            .frame(maxWidth: 360, alignment: .leading)
-                        }
-                    }
-
-                    // Custom Base URL (shown for Custom/Proxy or if user wants to override)
-                    if activeConfig.providerId == "custom" || activeConfig.providerId == "ollama" {
+                        // Dynamic Model Dropdown
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text("Endpoint URL")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                Text("MODEL (CHAT & TOOL CALLING)")
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.45))
                                 Spacer()
-                                Text("Default: \(activeConfig.defaultBaseURL)")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                if isLoadingModels {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                        .scaleEffect(0.6)
+                                }
+                                Button {
+                                    Task {
+                                        await refreshModels()
+                                    }
+                                } label: {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.6))
+                                }
+                                .buttonStyle(.plain)
+                                .help("Refresh available models from provider API")
                             }
 
-                            TextField("http://...", text: $customBaseUrl)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(.body, design: .monospaced))
+                            if activeConfig.providerId == "custom" && availableModels.isEmpty {
+                                TextField("Model name (e.g. llama3.2, mistral)", text: $customModelName)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 12))
+                                    .padding(8)
+                                    .background(ControlCenterTokens.Colors.sunkenSurface)
+                                    .cornerRadius(6)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                                    )
+                            } else {
+                                Picker("", selection: $selectedModel) {
+                                    ForEach(availableModels) { model in
+                                        Text(model.displayName).tag(model.modelId)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(maxWidth: 360, alignment: .leading)
+                            }
+                        }
+
+                        // Custom Base URL
+                        if activeConfig.providerId == "custom" || activeConfig.providerId == "ollama" {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text("ENDPOINT URL")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.white.opacity(0.45))
+                                    Spacer()
+                                    Text("Default: \(activeConfig.defaultBaseURL)")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+
+                                TextField("http://...", text: $customBaseUrl)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 12, design: .monospaced))
+                                    .padding(8)
+                                    .background(ControlCenterTokens.Colors.sunkenSurface)
+                                    .cornerRadius(6)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                                    )
+                            }
                         }
                     }
                 }
-                .padding(16)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
 
                 // 2. API Credentials Card
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Label("API Credentials", systemImage: "key.fill")
-                            .font(.headline)
-                        Spacer()
-                        // Source Indicator
-                        Text(LLMService.shared.credentialSource)
-                            .font(.caption2.weight(.medium))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2.5)
-                            .background(Color.green.opacity(0.15))
-                            .foregroundColor(.green)
-                            .cornerRadius(4)
-                    }
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentIndigo.opacity(0.2))
+                                    .frame(width: 28, height: 28)
 
-                    Divider()
-
-                    if activeConfig.requiresApiKey {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(apiKeyFieldLabel)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                if let helpURL = activeConfig.helpURL, let url = URL(string: helpURL) {
-                                    Link("Get API Key ↗", destination: url)
-                                        .font(.caption2)
-                                }
+                                Image(systemName: "key.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentIndigo)
                             }
 
-                            HStack {
-                                if showKey {
-                                    TextField(apiKeyPlaceholder, text: activeKeyBinding)
-                                        .textFieldStyle(.roundedBorder)
-                                        .font(.system(.body, design: .monospaced))
-                                } else {
-                                    SecureField(apiKeyPlaceholder, text: activeKeyBinding)
-                                        .textFieldStyle(.roundedBorder)
-                                        .font(.system(.body, design: .monospaced))
-                                }
+                            Text("API Credentials")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
 
-                                Button {
-                                    showKey.toggle()
-                                } label: {
-                                    Image(systemName: showKey ? "eye.slash" : "eye")
-                                }
-                                .buttonStyle(.borderless)
-                            }
+                            Spacer()
+
+                            Text(LLMService.shared.credentialSource)
+                                .font(.system(size: 10, weight: .bold))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2.5)
+                                .background(ControlCenterTokens.Colors.accentEmerald.opacity(0.2))
+                                .foregroundColor(ControlCenterTokens.Colors.accentEmerald)
+                                .cornerRadius(4)
                         }
-                    } else {
-                        Text("No API key required for \(activeConfig.displayName).")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
 
-                    // Connection Test Button
-                    HStack {
-                        Button(action: verifyKey) {
-                            if isVerifying {
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
+
+                        if activeConfig.requiresApiKey {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(apiKeyFieldLabel.uppercased())
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.white.opacity(0.45))
+                                    Spacer()
+                                    if let helpURL = activeConfig.helpURL, let url = URL(string: helpURL) {
+                                        Link("Get API Key ↗", destination: url)
+                                            .font(.system(size: 11))
+                                            .foregroundColor(ControlCenterTokens.Colors.accentIndigo)
+                                    }
+                                }
+
+                                HStack(spacing: 8) {
+                                    if showKey {
+                                        TextField(apiKeyPlaceholder, text: activeKeyBinding)
+                                            .textFieldStyle(.plain)
+                                            .font(.system(size: 12, design: .monospaced))
+                                    } else {
+                                        SecureField(apiKeyPlaceholder, text: activeKeyBinding)
+                                            .textFieldStyle(.plain)
+                                            .font(.system(size: 12, design: .monospaced))
+                                    }
+
+                                    Button {
+                                        showKey.toggle()
+                                    } label: {
+                                        Image(systemName: showKey ? "eye.slash" : "eye")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.white.opacity(0.5))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(8)
+                                .background(ControlCenterTokens.Colors.sunkenSurface)
+                                .cornerRadius(6)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
+                                )
+                            }
+                        } else {
+                            Text("No API key required for \(activeConfig.displayName).")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+
+                        // Connection Test Button
+                        HStack {
+                            Button(action: verifyKey) {
                                 HStack(spacing: 6) {
-                                    ProgressView()
-                                        .scaleEffect(0.6)
-                                        .frame(width: 14, height: 14)
-                                    Text("Verifying...")
+                                    if isVerifying {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                            .scaleEffect(0.65)
+                                        Text("Verifying...")
+                                            .font(.system(size: 12, weight: .semibold))
+                                    } else {
+                                        Image(systemName: "bolt.horizontal.fill")
+                                            .font(.system(size: 11))
+                                        Text("Test Connection")
+                                            .font(.system(size: 12, weight: .semibold))
+                                    }
                                 }
-                            } else {
-                                Label("Test Connection", systemImage: "bolt.horizontal.fill")
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(ControlCenterTokens.Colors.accentIndigo)
+                                .foregroundColor(.white)
+                                .cornerRadius(6)
                             }
-                        }
-                        .disabled(isVerifying || (activeConfig.requiresApiKey && activeApiKey.isEmpty))
+                            .buttonStyle(.plain)
+                            .disabled(isVerifying || (activeConfig.requiresApiKey && activeApiKey.isEmpty))
 
-                        if let status = verifyStatus {
-                            HStack(spacing: 5) {
-                                Image(systemName: verifySuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .foregroundColor(verifySuccess ? .green : .red)
-                                Text(status)
-                                    .font(.caption)
-                                    .foregroundColor(verifySuccess ? .green : .red)
+                            if let status = verifyStatus {
+                                HStack(spacing: 5) {
+                                    Image(systemName: verifySuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                        .foregroundColor(verifySuccess ? ControlCenterTokens.Colors.accentEmerald : Color.red)
+                                    Text(status)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(verifySuccess ? ControlCenterTokens.Colors.accentEmerald : Color.red)
+                                }
+                                .padding(.leading, 8)
                             }
-                            .padding(.leading, 8)
-                        }
 
-                        Spacer()
+                            Spacer()
+                        }
                     }
                 }
-                .padding(16)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
 
                 // 3. Response Tuning Parameters
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Response Parameters", systemImage: "slider.horizontal.3")
-                        .font(.headline)
-
-                    Divider()
-
-                    // Temperature
-                    VStack(alignment: .leading, spacing: 4) {
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            Text("Temperature")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentAmber.opacity(0.2))
+                                    .frame(width: 28, height: 28)
+
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentAmber)
+                            }
+
+                            Text("Response Parameters")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
                             Spacer()
-                            Text(String(format: "%.1f", temperature))
-                                .font(.caption.monospacedDigit())
-                                .foregroundColor(.secondary)
                         }
 
-                        Slider(value: $temperature, in: 0.0...1.0, step: 0.05)
-                    }
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
 
-                    // Max Tokens
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Max Tokens")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("\(maxTokens)")
-                                .font(.caption.monospacedDigit())
-                                .foregroundColor(.secondary)
+                        // Temperature
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("TEMPERATURE (CREATIVITY)")
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.45))
+                                Spacer()
+                                Text(String(format: "%.2f", temperature))
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.white)
+                            }
+
+                            Slider(value: $temperature, in: 0.0...1.0, step: 0.05)
                         }
 
-                        Slider(value: Binding(
-                            get: { Double(maxTokens) },
-                            set: { maxTokens = Int($0) }
-                        ), in: 50...400, step: 25)
+                        // Max Tokens
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("MAX RESPONSE TOKENS")
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.45))
+                                Spacer()
+                                Text("\(maxTokens)")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.white)
+                            }
+
+                            Slider(value: Binding(
+                                get: { Double(maxTokens) },
+                                set: { maxTokens = Int($0) }
+                            ), in: 50...400, step: 25)
+                        }
                     }
                 }
-                .padding(16)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
             }
             .padding(24)
         }
@@ -303,7 +368,6 @@ public struct ModelsAISettingsView: View {
     private func autoDetectEnvironmentAndPopulate() {
         let env = ProcessInfo.processInfo.environment
 
-        // 1. If no provider was explicitly saved, auto-select based on detected environment
         if UserDefaults.standard.string(forKey: "selectedProvider") == nil {
             if let auto = ProviderRegistry.shared.autoDetectActiveEnvironment() {
                 selectedProvider = auto.provider.displayName
@@ -311,13 +375,11 @@ public struct ModelsAISettingsView: View {
                 populateKeyField(for: auto.provider.providerId, key: auto.apiKey)
             }
         } else {
-            // 2. If provider was saved, ensure model is compatible with this provider
             let config = ProviderRegistry.shared.find(idOrName: selectedProvider)
             if !LLMService.shared.isModelCompatibleWithProvider(model: selectedModel, providerId: config.providerId) {
                 selectedModel = config.defaultModel
             }
 
-            // 3. If the active key field is empty, check ONLY this provider's env vars
             if activeApiKey.isEmpty {
                 for varName in config.envVarNames {
                     if let val = env[varName], !val.isEmpty {
@@ -356,7 +418,6 @@ public struct ModelsAISettingsView: View {
             self.availableModels = models
             self.isLoadingModels = false
 
-            // Auto-select valid model if current selection does not match available models
             if !models.contains(where: { $0.modelId == self.selectedModel }) {
                 if let rec = models.first(where: { $0.isRecommended }) ?? models.first {
                     self.selectedModel = rec.modelId

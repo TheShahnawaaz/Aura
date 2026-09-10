@@ -13,14 +13,20 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         self.appState = appState
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 840, height: 560),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            contentRect: NSRect(x: 0, y: 0, width: 920, height: 620),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
         window.title = "Aura Control Center"
-        window.minSize = NSSize(width: 760, height: 480)
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.titlebarSeparatorStyle = .none
+        window.isMovableByWindowBackground = true
+        window.minSize = NSSize(width: 820, height: 520)
         window.isReleasedWhenClosed = false
+        window.backgroundColor = .clear
+        window.hasShadow = true
         window.center()
 
         let hostingView = NSHostingView(rootView: SettingsView(appState: appState))
@@ -37,6 +43,7 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
     /// Brings the Settings window forward, activating the application.
     public func showSettings() {
         guard let window = self.window else { return }
+        window.orderFrontRegardless()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Unified Capabilities Hub combining Native Tools, Domain Skills, and MCP Connectors.
+/// Unified Capabilities Hub combining Native Tools, Domain Skills, and MCP Connectors,
+/// styled with obsidian liquid-glass design.
 public struct CapabilitiesSettingsView: View {
     @State private var selectedTab: CapabilityTab = .tools
     @ObservedObject private var capabilityConfig = CapabilityConfigManager.shared
@@ -24,43 +25,37 @@ public struct CapabilitiesSettingsView: View {
     }
 
     public var body: some View {
-        ZStack {
-            Color(nsColor: .windowBackgroundColor)
-                .ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Capabilities")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                        Text("Manage Aura's local primitives, specialized domain workflows, and external protocol connectors.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-
-                    // Segmented Tab Picker
-                    Picker("", selection: $selectedTab) {
-                        ForEach(CapabilityTab.allCases) { tab in
-                            Label(tab.rawValue, systemImage: tab.iconName)
-                                .tag(tab)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 460)
-
-                    // Tab Content
-                    switch selectedTab {
-                    case .tools:
-                        ToolsSettingsView()
-                    case .skills:
-                        SkillsSettingsView()
-                    case .connectors:
-                        ConnectorsSettingsView()
-                    }
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 20) {
+                // Header
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Capabilities Hub")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    Text("Manage Aura's local execution primitives, specialized domain workflows, and external MCP servers.")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.6))
                 }
-                .padding(28)
+
+                // Liquid-Glass Tab Bar
+                ControlCenterLiquidTabBar(
+                    selectedTab: $selectedTab,
+                    tabs: CapabilityTab.allCases,
+                    titleForTab: { $0.rawValue },
+                    iconForTab: { $0.iconName }
+                )
+
+                // Tab Content
+                switch selectedTab {
+                case .tools:
+                    ToolsSettingsView()
+                case .skills:
+                    SkillsSettingsView()
+                case .connectors:
+                    ConnectorsSettingsView()
+                }
             }
+            .padding(24)
         }
     }
 }

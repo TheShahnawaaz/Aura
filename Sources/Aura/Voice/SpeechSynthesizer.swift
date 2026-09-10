@@ -1,7 +1,24 @@
 import AVFoundation
 import AppKit
 
-/// Manages voice output using native macOS AVSpeechSynthesizer with immediate barge-in interruption.
+public enum TTSProvider: String, CaseIterable, Identifiable {
+    case apple = "apple"
+    case groq = "groq"
+    case elevenlabs = "elevenlabs"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .apple: return "Apple Native (macOS Voices)"
+        case .groq: return "Groq Orpheus (Turbo LPU)"
+        case .elevenlabs: return "ElevenLabs Voice Synthesis"
+        }
+    }
+}
+
+/// Manages voice output across Apple Native, Groq Orpheus, and ElevenLabs TTS,
+/// featuring real-time visualizer envelope tracking, media ducking, and immediate barge-in interruption.
 @MainActor
 public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     public static let shared = SpeechSynthesizer()
@@ -12,13 +29,19 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
     private var envelopeTask: Task<Void, Never>? = nil
     private var targetLevel: Float = 0.0
     private var currentLevel: Float = 0.0
+    private var currentSynthesisTask: Task<Void, Never>? = nil
 
     private override init() {
         super.init()
         synthesizer.delegate = self
     }
 
-    /// Speaks the given text using the highest-quality available system voice.
+    public var currentProvider: TTSProvider {
+        let saved = UserDefaults.standard.string(forKey: "ttsEngine") ?? "apple"
+        return TTSProvider(rawValue: saved) ?? .apple
+    }
+
+    /// Speaks the given text using the configured TTS provider.
     public func speak(text: String, onFinished: (@Sendable () -> Void)? = nil) {
         // Immediate interruption of prior speech
         stopSpeaking()
@@ -26,7 +49,7 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
         let spokenEnabled = UserDefaults.standard.object(forKey: "spokenFeedbackEnabled") != nil ? UserDefaults.standard.bool(forKey: "spokenFeedbackEnabled") : true
         guard spokenEnabled else {
             AppState.shared.state = .speaking(text: text)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                 if case .speaking = AppState.shared.state {
                     AppState.shared.resetToIdle()
                 }
@@ -34,12 +57,38 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
             return
         }
 
+        switch currentProvider {
+        case .apple:
+            speakWithApple(text: text, onFinished: onFinished)
+        case .groq:
+            speakWithGroq(text: text, onFinished: onFinished)
+        case .elevenlabs:
+            speakWithElevenLabs(text: text, onFinished: onFinished)
+        }
+    }
+
+    /// Barge-in: immediately halts any in-progress speech synthesis or playback.
+    public func stopSpeaking() {
+        currentSynthesisTask?.cancel()
+        currentSynthesisTask = nil
+
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+        CloudAudioPlayer.shared.stop()
+
+        isSpeaking = false
+        stopEnvelopeTracking()
+        AudioDuckingManager.shared.unduckMedia()
+    }
+
+    // MARK: - Apple Native TTS
+    private func speakWithApple(text: String, onFinished: (@Sendable () -> Void)?) {
         let utterance = AVSpeechUtterance(string: text)
         let rate = UserDefaults.standard.object(forKey: "speechRate") != nil ? Float(UserDefaults.standard.double(forKey: "speechRate")) : (AVSpeechUtteranceDefaultSpeechRate * 1.05)
         utterance.rate = rate
         utterance.pitchMultiplier = 1.0
 
-        // Select preferred voice from user settings or fallback to default
         if let savedId = UserDefaults.standard.string(forKey: "selectedVoiceIdentifier"),
            let voice = AVSpeechSynthesisVoice(identifier: savedId) {
             utterance.voice = voice
@@ -55,17 +104,120 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
         synthesizer.speak(utterance)
     }
 
-    /// Barge-in: immediately halts any in-progress speech playback.
-    public func stopSpeaking() {
-        if synthesizer.isSpeaking {
-            synthesizer.stopSpeaking(at: .immediate)
+    // MARK: - Groq Orpheus TTS
+    private func speakWithGroq(text: String, onFinished: (@Sendable () -> Void)?) {
+        let apiKey = getGroqTTSApiKey()
+        guard !apiKey.isEmpty else {
+            NSLog("Aura: Groq TTS API key missing.")
+            AppState.shared.state = .error(message: "Missing Groq TTS API Key.")
+            return
         }
-        isSpeaking = false
-        stopEnvelopeTracking()
-        AudioDuckingManager.shared.unduckMedia()
+
+        let voice = UserDefaults.standard.string(forKey: "groqTTSVoice") ?? "autumn"
+
+        isSpeaking = true
+        AppState.shared.state = .speaking(text: text)
+        AudioDuckingManager.shared.duckMedia()
+
+        currentSynthesisTask = Task {
+            do {
+                guard let url = URL(string: "https://api.groq.com/openai/v1/audio/speech") else { return }
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                let payload: [String: Any] = [
+                    "model": "canopylabs/orpheus-v1-english",
+                    "voice": voice,
+                    "input": String(text.prefix(250)),
+                    "response_format": "wav"
+                ]
+                request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard !Task.isCancelled else { return }
+
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                    let err = String(data: data, encoding: .utf8) ?? "HTTP error"
+                    NSLog("Aura: Groq TTS error: %@", err)
+                    AppState.shared.state = .error(message: "Groq TTS failed.")
+                    return
+                }
+
+                CloudAudioPlayer.shared.play(data: data, spokenText: text, onFinished: onFinished)
+            } catch {
+                guard !Task.isCancelled else { return }
+                NSLog("Aura: Groq TTS exception: %@", error.localizedDescription)
+                AppState.shared.state = .error(message: "Groq TTS failed.")
+            }
+        }
     }
 
-    // MARK: - Dynamic Vocal Envelope Modulation
+    // MARK: - ElevenLabs TTS
+    private func speakWithElevenLabs(text: String, onFinished: (@Sendable () -> Void)?) {
+        let apiKey = getElevenLabsTTSApiKey()
+        guard !apiKey.isEmpty else {
+            NSLog("Aura: ElevenLabs TTS API key missing.")
+            AppState.shared.state = .error(message: "Missing ElevenLabs TTS API Key.")
+            return
+        }
+
+        let voiceId = UserDefaults.standard.string(forKey: "elevenLabsTTSVoiceId") ?? "EXAVITQu4vr4xnSDxMaL"
+        let modelId = UserDefaults.standard.string(forKey: "elevenLabsTTSModel") ?? "eleven_flash_v2_5"
+
+        isSpeaking = true
+        AppState.shared.state = .speaking(text: text)
+        AudioDuckingManager.shared.duckMedia()
+
+        currentSynthesisTask = Task {
+            do {
+                guard let url = URL(string: "https://api.elevenlabs.io/v1/text-to-speech/\(voiceId)") else { return }
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue(apiKey, forHTTPHeaderField: "xi-api-key")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                let payload: [String: Any] = [
+                    "text": text,
+                    "model_id": modelId
+                ]
+                request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard !Task.isCancelled else { return }
+
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                    let err = String(data: data, encoding: .utf8) ?? "HTTP error"
+                    NSLog("Aura: ElevenLabs TTS error: %@", err)
+                    AppState.shared.state = .error(message: "ElevenLabs TTS failed.")
+                    return
+                }
+
+                CloudAudioPlayer.shared.play(data: data, spokenText: text, onFinished: onFinished)
+            } catch {
+                guard !Task.isCancelled else { return }
+                NSLog("Aura: ElevenLabs TTS exception: %@", error.localizedDescription)
+                AppState.shared.state = .error(message: "ElevenLabs TTS failed.")
+            }
+        }
+    }
+
+    // MARK: - Key Helpers with Environment Variable Fallback
+    public func getGroqTTSApiKey() -> String {
+        let saved = UserDefaults.standard.string(forKey: "groqTTSApiKey")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !saved.isEmpty { return saved }
+        return ProcessInfo.processInfo.environment["GROQ_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    public func getElevenLabsTTSApiKey() -> String {
+        let saved = UserDefaults.standard.string(forKey: "elevenLabsTTSApiKey")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !saved.isEmpty { return saved }
+        let env = ProcessInfo.processInfo.environment["ELEVENLABS_API_KEY"] ?? ProcessInfo.processInfo.environment["XI_API_KEY"]
+        return env?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    // MARK: - Dynamic Vocal Envelope Modulation for Apple TTS
     private func startEnvelopeTracking() {
         envelopeTask?.cancel()
         currentLevel = 0.0
@@ -75,11 +227,9 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
                 try? await Task.sleep(nanoseconds: 33_000_000) // ~30 FPS
                 guard let self = self, self.isSpeaking else { break }
 
-                // Smooth exponential glide towards target level
                 let smoothing: Float = 0.32
                 self.currentLevel += (self.targetLevel - self.currentLevel) * smoothing
 
-                // Natural cadence decay if target is sustained
                 if self.targetLevel > 0.04 {
                     self.targetLevel = max(0.04, self.targetLevel * 0.91)
                 }
@@ -115,21 +265,14 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
             }
         }
 
-        // Fast intensity calculation
         let clampedLen = Float(min(12, max(1, wordLength)))
         let intensity: Float = min(0.92, 0.40 + (clampedLen * 0.05))
 
         Task { @MainActor in
-            guard self.isSpeaking else { return }
-            self.targetLevel = intensity
-
             if hasPunctuationPause {
-                let delay = max(0.16, Double(clampedLen) * 0.05)
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    if self?.isSpeaking == true {
-                        self?.targetLevel = 0.02
-                    }
-                }
+                self.targetLevel = 0.04
+            } else {
+                self.targetLevel = intensity
             }
         }
     }
@@ -140,7 +283,7 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
             self.stopEnvelopeTracking()
             AudioDuckingManager.shared.unduckMedia()
             if case .speaking = AppState.shared.state {
-                AppState.shared.completeSpeakingAndPresent()
+                AppState.shared.resetToIdle()
             }
         }
     }
@@ -150,6 +293,9 @@ public final class SpeechSynthesizer: NSObject, ObservableObject, AVSpeechSynthe
             self.isSpeaking = false
             self.stopEnvelopeTracking()
             AudioDuckingManager.shared.unduckMedia()
+            if case .speaking = AppState.shared.state {
+                AppState.shared.resetToIdle()
+            }
         }
     }
 }

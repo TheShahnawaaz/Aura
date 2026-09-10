@@ -15,7 +15,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hotkeyManager = HotkeyManager.shared
     private let audioCapture = AudioCaptureService.shared
     private let speechSynthesizer = SpeechSynthesizer.shared
-    private let speechRecognizer = NativeSpeechRecognizer.shared
+    private let speechRecognitionRouter = SpeechRecognitionRouter.shared
 
     private var dockHostingView: NSView?
     private var dockAnimationTimer: Timer?
@@ -28,8 +28,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
-        // Register URLProtocol to transparently preserve Google Gemini thought signatures
-        GeminiThoughtSignatureProtocol.register()
 
         // Configure as a standard Dock application
         NSApplication.shared.setActivationPolicy(.regular)
@@ -160,7 +158,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         case .processing, .awaitingConfirmation:
             // Cancel current processing
             audioCapture.stopCapture()
-            speechRecognizer.stopRecognition()
+            speechRecognitionRouter.cancelRecognition()
             appState.resetToIdle()
         }
     }
@@ -173,7 +171,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         switch appState.state {
         case .listening:
             audioCapture.stopCapture()
-            speechRecognizer.cancelRecognition()
+            speechRecognitionRouter.cancelRecognition()
             AudioDuckingManager.shared.unduckMedia()
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                 appState.resetToIdle()
@@ -188,7 +186,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         case .processing, .awaitingConfirmation, .error:
             audioCapture.stopCapture()
-            speechRecognizer.cancelRecognition()
+            speechRecognitionRouter.cancelRecognition()
             speechSynthesizer.stopSpeaking()
             AudioDuckingManager.shared.unduckMedia()
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -213,18 +211,28 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         silenceTask?.cancel()
 
         do {
-            try speechRecognizer.startRecognition { [weak self] liveTranscript, isFinal in
+            try speechRecognitionRouter.startRecognition { [weak self] liveTranscript, isFinal in
                 Task { @MainActor in
                     guard let self else { return }
-                    self.appState.partialTranscript = liveTranscript
-                    self.appState.transcript = liveTranscript
-                    self.lastSpeechTime = Date()
+                    if !liveTranscript.isEmpty {
+                        self.appState.partialTranscript = liveTranscript
+                        self.appState.transcript = liveTranscript
+                        self.lastSpeechTime = Date()
+                    }
                     self.scheduleSilenceCheckIfNeeded()
                 }
             }
 
             try audioCapture.startCapture { [weak self] buffer in
-                self?.speechRecognizer.appendAudioBuffer(buffer)
+                guard let self else { return }
+                self.speechRecognitionRouter.appendAudioBuffer(buffer)
+                let level = AudioCaptureService.calculateRMS(buffer: buffer)
+                if level > 0.05 {
+                    Task { @MainActor in
+                        self.lastSpeechTime = Date()
+                        self.scheduleSilenceCheckIfNeeded()
+                    }
+                }
             }
         } catch {
             appState.state = .error(message: error.localizedDescription)
@@ -238,7 +246,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         silenceTask?.cancel()
         silenceTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(threshold * 1_000_000_000))
-            if !Task.isCancelled, self.appState.state == .listening, !self.appState.partialTranscript.isEmpty {
+            if !Task.isCancelled, self.appState.state == .listening {
                 self.submitVoiceSession()
             }
         }
@@ -249,22 +257,26 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         silenceTask = nil
 
         audioCapture.stopCapture()
-        speechRecognizer.stopRecognition()
         appState.stopListeningAndProcess()
 
-        let userPrompt = appState.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        speechRecognitionRouter.stopRecognition { [weak self] finalTranscript in
+            Task { @MainActor in
+                guard let self else { return }
+                if !finalTranscript.isEmpty {
+                    self.appState.transcript = finalTranscript
+                }
 
-        guard !userPrompt.isEmpty else {
-            appState.state = .error(message: "No speech recognized. Please try again.")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
-                self?.appState.resetToIdle()
-            }
-            return
-        }
+                let userPrompt = self.appState.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        Task {
-            let answer = await AgentSessionManager.shared.processPrompt(text: userPrompt, isVoice: true)
-            await MainActor.run {
+                guard !userPrompt.isEmpty else {
+                    self.appState.state = .error(message: "No speech recognized. Please try again.")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                        self?.appState.resetToIdle()
+                    }
+                    return
+                }
+
+                let answer = await AgentSessionManager.shared.processPrompt(text: userPrompt, isVoice: true)
                 self.appState.responseText = answer
             }
         }
@@ -284,6 +296,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationWillTerminate(_ notification: Notification) {
         hotkeyManager.unregister()
         audioCapture.stopCapture()
-        speechRecognizer.stopRecognition()
+        speechRecognitionRouter.cancelRecognition()
     }
 }

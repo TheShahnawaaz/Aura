@@ -13,7 +13,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/terryso/open-agent-sdk-swift.git", branch: "main")
+        .package(url: "https://github.com/TheShahnawaaz/open-agent-sdk-swift.git", branch: "main")
     ],
     targets: [
         .executableTarget(

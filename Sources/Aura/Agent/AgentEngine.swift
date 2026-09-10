@@ -5,15 +5,14 @@ import OpenAgentSDK
 public final class AgentEngine: @unchecked Sendable {
     public static let shared = AgentEngine()
 
-    private init() {
-        GeminiThoughtSignatureProtocol.register()
-    }
+    private init() {}
 
     /// Runs a single turn using OpenAgentSDK in-process runtime, invoking tools and emitting live progress.
     public func runTurn(
         session: ConversationSession,
         userPrompt: String,
         isVoice: Bool,
+        userImages: [UserImageAttachment] = [],
         onPhaseUpdate: (@Sendable (String) -> Void)? = nil,
         onInterimText: (@Sendable (String) -> Void)? = nil,
         onToolStart: (@Sendable (ToolCallRecord) -> Void)? = nil,
@@ -157,6 +156,13 @@ public final class AgentEngine: @unchecked Sendable {
           - Use `Skill` to invoke active domain workflows when the user intent matches a skill.
         </TOOL_ROUTING_MATRIX>
 
+        <VISUAL_GROUNDING_AND_ANTI_BLUFFING>
+        * ZERO VISUAL FABRICATION (CRITICAL): Never guess, invent, or extrapolate the visual contents of an image or screenshot from its filename, file path, dimensions, or timestamps.
+        * Real visual pixels are provided directly in your context following an image tool call (`take_screenshot`, `view_image`) or when an image is attached. Inspect the actual image visual content.
+        * If you cannot inspect the visual content, or if visual data is missing, you MUST state honestly: "I was unable to visually inspect the contents of this image."
+        * Never bluff or describe fictitious websites, calendars, recycle bins, or UI elements that are not visibly present in the image.
+        </VISUAL_GROUNDING_AND_ANTI_BLUFFING>
+
         <SPEECH_AND_FORMATTING>
         * Keep responses direct, natural, and conversational.
         * Do NOT use markdown asterisks (*, **), raw code fences, or bullet lists in conversational summaries so responses sound clean and fluid when spoken aloud.
@@ -183,7 +189,7 @@ public final class AgentEngine: @unchecked Sendable {
         let agent = createAgent(options: options)
         onPhaseUpdate?("Thinking...")
 
-        var result = await agent.prompt(historyContext)
+        var result = await agent.prompt(historyContext, images: userImages)
         var executed = await toolTracker.records
         var interimSpeech: String? = nil
 
@@ -274,17 +280,7 @@ actor ToolExecutionTracker {
         let elapsed = max(Int((CFAbsoluteTimeGetCurrent() - started) * 1000), 1)
 
         func detectImagePath(name: String, args: String, out: String) -> String? {
-            // 1. If output contains "Saved to /path/to/img.jpg" or "Screenshot saved to /..."
-            if let range = out.range(of: #"(?:Saved to |screenshot saved to )([^\s\n]+\.(?:png|jpg|jpeg|webp|bmp|heic))"#, options: [.regularExpression, .caseInsensitive]) {
-                let match = String(out[range])
-                if let colonRange = match.range(of: #"/.*"#, options: .regularExpression) {
-                    let path = String(match[colonRange]).trimmingCharacters(in: CharacterSet(charactersIn: " .,"))
-                    if FileManager.default.fileExists(atPath: path) {
-                        return path
-                    }
-                }
-            }
-            // 2. If view_image tool, extract file_path from arguments
+            // 1. If view_image tool, extract file_path from arguments
             if name.lowercased() == "view_image" {
                 if let range = args.range(of: #""file_path"\s*:\s*"([^"]+)""#, options: .regularExpression) {
                     let full = String(args[range])
@@ -297,8 +293,18 @@ actor ToolExecutionTracker {
                     }
                 }
             }
-            // 3. Fallback: Check if output itself has an absolute image file path
-            if let range = out.range(of: #"(/Users/[^\s\n]+\.(?:png|jpg|jpeg|webp|bmp|heic))"#, options: [.regularExpression, .caseInsensitive]) {
+            // 2. Match "Saved to /path/to/file.ext" (supports paths with spaces like Application Support)
+            if let range = out.range(of: #"(?:Saved to |screenshot saved to\s*)(/[^\n\r]+?\.(?:png|jpg|jpeg|webp|bmp|heic))"#, options: [.regularExpression, .caseInsensitive]) {
+                let match = String(out[range])
+                if let slashRange = match.range(of: #"/.*"#, options: .regularExpression) {
+                    let path = String(match[slashRange]).trimmingCharacters(in: CharacterSet(charactersIn: " .,"))
+                    if FileManager.default.fileExists(atPath: path) {
+                        return path
+                    }
+                }
+            }
+            // 3. Fallback: Match any absolute image path on macOS (/Users/... or /tmp/... or /var/...)
+            if let range = out.range(of: #"((?:/Users|/tmp|/var|/private)[^\n\r]+?\.(?:png|jpg|jpeg|webp|bmp|heic))"#, options: [.regularExpression, .caseInsensitive]) {
                 let path = String(out[range]).trimmingCharacters(in: CharacterSet(charactersIn: " .,"))
                 if FileManager.default.fileExists(atPath: path) {
                     return path

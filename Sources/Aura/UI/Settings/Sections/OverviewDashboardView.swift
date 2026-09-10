@@ -19,241 +19,327 @@ public struct OverviewDashboardView: View {
     }
 
     public var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 20) {
                 // Section Header
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("System Overview")
-                        .font(.title2.weight(.bold))
-                    Text("Live health metrics, active AI engine status, and diagnostic controls.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("System Overview")
+                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+
+                        Text("Live telemetry, active model performance, and hardware diagnostics.")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+
+                    Spacer()
+
+                    // Engine Status Pill
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(stateColor)
+                            .frame(width: 7, height: 7)
+                            .shadow(color: stateColor.opacity(0.8), radius: 3)
+
+                        Text("60 FPS ENGINE")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.75))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(6)
                 }
 
                 // Hero Card with Living Aurora Orb
-                HStack(spacing: 18) {
-                    LivingAuroraOrbView(appState: appState, size: 56, showSquircleBackground: true)
+                ControlCenterGlassCard {
+                    HStack(spacing: 20) {
+                        LivingAuroraOrbView(appState: appState, size: 60, showSquircleBackground: false)
+                            .shadow(color: stateColor.opacity(0.35), radius: 12)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Text("Aura Core")
-                                .font(.headline)
-                            Text(stateText.uppercased())
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(stateColor.opacity(0.18))
-                                .foregroundColor(stateColor)
-                                .cornerRadius(4)
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 8) {
+                                Text("Aura Agent Core")
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+
+                                Text(stateText.uppercased())
+                                    .font(.system(size: 10, weight: .black, design: .monospaced))
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2.5)
+                                    .background(stateColor.opacity(0.2))
+                                    .foregroundColor(stateColor)
+                                    .cornerRadius(4)
+                            }
+
+                            Text("Multimodal speech synthesizer, cognitive engine, and macOS automation supervisor.")
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.65))
+                                .lineLimit(2)
+
+                            // Telemetry Tags
+                            HStack(spacing: 8) {
+                                telemetryPill(icon: "brain", text: LLMService.shared.activeModelName)
+                                telemetryPill(icon: "mic.fill", text: "Apple Speech Engine")
+                                telemetryPill(icon: "bolt.fill", text: "Zero-Latency Buffer")
+                            }
+                            .padding(.top, 4)
                         }
-                        Text("Tactile living aurora glass orb with active real-time voice, reasoning, and speech synthesis.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                }
-                .padding(14)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
 
-                // 1. Assistant Status Grid
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    statusCard(
-                        title: "Assistant State",
-                        value: stateText,
-                        icon: "waveform.circle.fill",
-                        iconColor: stateColor,
-                        badge: appState.state == .idle ? "Standby" : "Active"
-                    )
-
-                    statusCard(
-                        title: "Global Trigger",
-                        value: appState.hotkeyDisplayString,
-                        icon: "command.circle.fill",
-                        iconColor: .green,
-                        badge: "Registered"
-                    )
-                }
-
-                // 2. Active AI Model & Connection Test Card
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack {
-                        Label("Active AI Engine", systemImage: "brain.head.profile")
-                            .font(.headline)
                         Spacer()
-                        Text(LLMService.shared.activeProviderName)
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.blue.opacity(0.15))
-                            .foregroundColor(.blue)
-                            .cornerRadius(6)
                     }
+                }
 
-                    Divider()
+                // 2x2 Metric Cards Grid
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                    // Card 1: Runtime State
+                    ControlCenterGlassCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .fill(stateColor.opacity(0.2))
+                                        .frame(width: 28, height: 28)
 
-                    VStack(spacing: 8) {
-                        detailRow(label: "Model", value: LLMService.shared.activeModelName)
-                        detailRow(label: "Credential Source", value: LLMService.shared.credentialSource)
-                        detailRow(label: "API Endpoint", value: LLMService.shared.activeBaseURL)
-                    }
-
-                    // Interactive Ping Button
-                    HStack {
-                        Button {
-                            runModelTest()
-                        } label: {
-                            HStack(spacing: 6) {
-                                if isTestingModel {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                } else {
-                                    Image(systemName: "bolt.horizontal.fill")
+                                    Image(systemName: "waveform.circle.fill")
+                                        .font(.system(size: 15))
+                                        .foregroundColor(stateColor)
                                 }
-                                Text(isTestingModel ? "Testing Latency..." : "Test Connection")
+
+                                Spacer()
+
+                                Text(appState.state == .idle ? "Standby" : "Active")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(stateColor.opacity(0.18))
+                                    .foregroundColor(stateColor)
+                                    .cornerRadius(4)
+                            }
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("ASSISTANT STATE")
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.4))
+                                Text(stateText)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
                             }
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                        .disabled(isTestingModel)
+                    }
 
-                        if let result = testResult {
-                            HStack(spacing: 5) {
-                                Circle()
-                                    .fill(result.success ? Color.green : Color.red)
-                                    .frame(width: 7, height: 7)
-                                Text(result.success ? "Connected in \(result.latencyMs)ms" : result.message)
-                                    .font(.caption.weight(.medium))
-                                    .foregroundColor(result.success ? .green : .red)
+                    // Card 2: Global Trigger
+                    ControlCenterGlassCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .fill(ControlCenterTokens.Colors.accentEmerald.opacity(0.2))
+                                        .frame(width: 28, height: 28)
+
+                                    Image(systemName: "command.circle.fill")
+                                        .font(.system(size: 15))
+                                        .foregroundColor(ControlCenterTokens.Colors.accentEmerald)
+                                }
+
+                                Spacer()
+
+                                Text("System Intercept")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(ControlCenterTokens.Colors.accentEmerald.opacity(0.18))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentEmerald)
+                                    .cornerRadius(4)
                             }
-                            .padding(.leading, 8)
-                        }
 
-                        Spacer()
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("GLOBAL SHORTCUT")
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.4))
+
+                                HStack(spacing: 4) {
+                                    ControlCenterKeycapView(appState.hotkeyDisplayString, fontSize: 13)
+                                    Text("Press anywhere")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.45))
+                                        .padding(.leading, 4)
+                                }
+                            }
+                        }
                     }
                 }
-                .padding(16)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
 
-                // 3. Live Microphone Health
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Label("Microphone & Audio Input", systemImage: "mic.fill")
-                            .font(.headline)
-                        Spacer()
-                        Text("Authorized")
-                            .font(.caption.weight(.semibold))
-                            .foregroundColor(.green)
-                    }
-
-                    Divider()
-
-                    VStack(alignment: .leading, spacing: 8) {
+                // AI Engine Diagnostics Card
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            Text("Real-Time Input Level:")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentPurple.opacity(0.2))
+                                    .frame(width: 28, height: 28)
+
+                                Image(systemName: "brain.head.profile")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentPurple)
+                            }
+
+                            Text("Active AI Engine Diagnostics")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
                             Spacer()
-                            Text(String(format: "%.0f%%", appState.audioLevel * 100))
-                                .font(.caption.weight(.bold).monospacedDigit())
-                                .foregroundColor(.secondary)
+
+                            Text(LLMService.shared.activeProviderName)
+                                .font(.system(size: 11, weight: .bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(ControlCenterTokens.Colors.accentIndigo.opacity(0.25))
+                                .foregroundColor(ControlCenterTokens.Colors.accentIndigo)
+                                .cornerRadius(6)
                         }
 
-                        // Audio Level Bar
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color.primary.opacity(0.08))
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
 
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.blue, .cyan, .green],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: max(8, geo.size.width * CGFloat(min(1.0, appState.audioLevel * 2.5))))
-                                    .animation(.interactiveSpring(response: 0.1, dampingFraction: 0.7), value: appState.audioLevel)
-                            }
+                        VStack(spacing: 8) {
+                            detailRow(label: "Model", value: LLMService.shared.activeModelName)
+                            detailRow(label: "Credential Source", value: LLMService.shared.credentialSource)
+                            detailRow(label: "API Endpoint", value: LLMService.shared.activeBaseURL)
                         }
-                        .frame(height: 10)
 
+                        // Interactive Ping Button
                         HStack {
-                            Text("Speech Recognizer:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("Apple Speech (Speech.framework SFSpeechAudioBuffer)")
-                                .font(.caption.weight(.medium))
+                            Button {
+                                runModelTest()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if isTestingModel {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                            .scaleEffect(0.7)
+                                    } else {
+                                        Image(systemName: "bolt.horizontal.fill")
+                                            .font(.system(size: 11))
+                                    }
+                                    Text(isTestingModel ? "Testing Latency..." : "Test Connection")
+                                        .font(.system(size: 12, weight: .semibold))
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(ControlCenterTokens.Colors.accentIndigo)
+                                .foregroundColor(.white)
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isTestingModel)
+
+                            if let result = testResult {
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(result.success ? ControlCenterTokens.Colors.accentEmerald : Color.red)
+                                        .frame(width: 7, height: 7)
+                                    Text(result.success ? "Connected in \(result.latencyMs)ms" : result.message)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(result.success ? ControlCenterTokens.Colors.accentEmerald : Color.red)
+                                }
+                                .padding(.leading, 8)
+                            }
+
+                            Spacer()
                         }
-                        .padding(.top, 4)
                     }
                 }
-                .padding(16)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-                )
+
+                // Microphone & Audio Level Card
+                ControlCenterGlassCard {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(ControlCenterTokens.Colors.accentCyan.opacity(0.2))
+                                    .frame(width: 28, height: 28)
+
+                                Image(systemName: "mic.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(ControlCenterTokens.Colors.accentCyan)
+                            }
+
+                            Text("Microphone & Audio Input")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            Spacer()
+
+                            Text("Authorized")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(ControlCenterTokens.Colors.accentEmerald)
+                        }
+
+                        Divider()
+                            .overlay(Color.white.opacity(0.06))
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Real-Time Input Level:")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.white.opacity(0.6))
+                                Spacer()
+                                Text(String(format: "%.0f%%", appState.audioLevel * 100))
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundColor(.white)
+                            }
+
+                            // 16-bar responsive equalizer visualizer
+                            HStack {
+                                ControlCenterEqualizerView(audioLevel: appState.audioLevel, barCount: 24, height: 26)
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+
+                            HStack {
+                                Text("Speech Recognizer:")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.5))
+                                Text("Apple Speech (Speech.framework SFSpeechAudioBuffer)")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        }
+                    }
+                }
             }
             .padding(24)
         }
     }
 
-    // MARK: - Helper Views
-    private func statusCard(title: String, value: String, icon: String, iconColor: Color, badge: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundColor(iconColor)
-                    .font(.title3)
-                Spacer()
-                Text(badge)
-                    .font(.caption2.weight(.bold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(iconColor.opacity(0.15))
-                    .foregroundColor(iconColor)
-                    .cornerRadius(4)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(value)
-                    .font(.headline.weight(.semibold))
-                    .lineLimit(1)
-            }
+    // MARK: - Helpers
+    private func telemetryPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 9))
+                .foregroundColor(.white.opacity(0.6))
+            Text(text)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white.opacity(0.8))
         }
-        .padding(14)
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        )
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(Color.white.opacity(0.06))
+        .cornerRadius(4)
     }
 
     private func detailRow(label: String, value: String) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.55))
             Spacer()
             Text(value)
-                .font(.subheadline.weight(.medium))
-                .foregroundColor(.primary)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.9))
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
@@ -272,12 +358,12 @@ public struct OverviewDashboardView: View {
 
     private var stateColor: Color {
         switch appState.state {
-        case .idle: return .green
-        case .listening: return .red
-        case .processing: return .cyan
-        case .speaking: return .purple
-        case .awaitingConfirmation: return .orange
-        case .error: return .red
+        case .idle: return ControlCenterTokens.Colors.accentEmerald
+        case .listening: return Color.red
+        case .processing: return ControlCenterTokens.Colors.accentCyan
+        case .speaking: return ControlCenterTokens.Colors.accentPurple
+        case .awaitingConfirmation: return ControlCenterTokens.Colors.accentAmber
+        case .error: return Color.red
         }
     }
 

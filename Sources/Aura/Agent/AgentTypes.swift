@@ -8,6 +8,7 @@ public struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
     public let timestamp: Date
     public var toolCalls: [ToolCallRecord]
     public let isVoice: Bool
+    public var imagePaths: [String]?
 
     public enum Role: String, Codable, Sendable {
         case user
@@ -22,7 +23,8 @@ public struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
         content: String,
         timestamp: Date = Date(),
         toolCalls: [ToolCallRecord] = [],
-        isVoice: Bool = false
+        isVoice: Bool = false,
+        imagePaths: [String]? = nil
     ) {
         self.id = id
         self.role = role
@@ -30,6 +32,7 @@ public struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
         self.timestamp = timestamp
         self.toolCalls = toolCalls
         self.isVoice = isVoice
+        self.imagePaths = imagePaths
     }
 }
 
