@@ -49,7 +49,7 @@ export const HeroSection: React.FC = () => {
           className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-[#11131a] border border-white/[0.08] hover:border-white/20 text-slate-300 font-mono text-xs transition-all hover:bg-[#161822]"
         >
           <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-          <span>brew install --cask aura</span>
+          <span>brew install TheShahnawaaz/tap/aura</span>
         </a>
       </div>
 

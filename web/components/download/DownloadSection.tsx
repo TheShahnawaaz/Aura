@@ -6,7 +6,7 @@ import { Download, Apple, Copy, Check, Shield, Cpu } from "lucide-react";
 
 export const DownloadSection: React.FC = () => {
   const [copied, setCopied] = useState(false);
-  const brewCommand = "brew install --cask aura";
+  const brewCommand = "brew install TheShahnawaaz/tap/aura";
 
   const handleCopy = () => {
     navigator.clipboard.writeText(brewCommand);
