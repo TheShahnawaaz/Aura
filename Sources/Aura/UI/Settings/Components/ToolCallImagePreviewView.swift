@@ -2,9 +2,9 @@ import AppKit
 import ImageIO
 import SwiftUI
 
-/// High-performance thread-safe memory cache for downsampled tool image thumbnails.
-/// Prevents main-thread UI hitching by decoding images asynchronously on a background task.
-public final class ImageThumbnailCache: @unchecked Sendable {
+/// High-performance memory cache for downsampled tool image thumbnails.
+@MainActor
+public final class ImageThumbnailCache {
     public static let shared = ImageThumbnailCache()
 
     private let cache = NSCache<NSString, CachedThumbnail>()
@@ -36,39 +36,37 @@ public final class ImageThumbnailCache: @unchecked Sendable {
             return existing
         }
 
-        return await Task.detached(priority: .userInitiated) {
-            let url = URL(fileURLWithPath: path)
-            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let url = URL(fileURLWithPath: path)
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
 
-            // Extract real full-resolution dimensions without decoding full bitmap
-            var origW = 0
-            var origH = 0
-            if let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] {
-                origW = props[kCGImagePropertyPixelWidth] as? Int ?? 0
-                origH = props[kCGImagePropertyPixelHeight] as? Int ?? 0
-            }
+        // Extract real full-resolution dimensions without decoding full bitmap
+        var origW = 0
+        var origH = 0
+        if let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] {
+            origW = props[kCGImagePropertyPixelWidth] as? Int ?? 0
+            origH = props[kCGImagePropertyPixelHeight] as? Int ?? 0
+        }
 
-            // Downsample directly into thumbnail buffer via ImageIO hardware decode
-            let options: [CFString: Any] = [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceShouldCacheImmediately: true,
-                kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: Int(maxDimension)
-            ]
+        // Downsample directly into thumbnail buffer via ImageIO hardware decode
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: Int(maxDimension)
+        ]
 
-            guard let cgThumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-                return nil
-            }
+        guard let cgThumb = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
 
-            if origW == 0 { origW = cgThumb.width }
-            if origH == 0 { origH = cgThumb.height }
+        if origW == 0 { origW = cgThumb.width }
+        if origH == 0 { origH = cgThumb.height }
 
-            let thumbImage = NSImage(cgImage: cgThumb, size: NSSize(width: cgThumb.width, height: cgThumb.height))
-            let cached = CachedThumbnail(image: thumbImage, originalWidth: origW, originalHeight: origH)
-            self.cache.setObject(cached, forKey: path as NSString)
+        let thumbImage = NSImage(cgImage: cgThumb, size: NSSize(width: cgThumb.width, height: cgThumb.height))
+        let cached = CachedThumbnail(image: thumbImage, originalWidth: origW, originalHeight: origH)
+        self.cache.setObject(cached, forKey: path as NSString)
 
-            return (thumbImage, origW, origH)
-        }.value
+        return (thumbImage, origW, origH)
     }
 }
 
