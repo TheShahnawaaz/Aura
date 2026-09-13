@@ -126,105 +126,120 @@ public struct NotchHUDView: View {
             }
         }
         .frame(width: targetWidth, height: targetHeight, alignment: .top)
-        .background(
-            ZStack {
-                // True pitch-black base (#000000) - exact optical match to MacBook notch and iPhone Dynamic Island
-                HUDDesignTokens.Colors.notchBlack
-
-                // Rich obsidian liquid-glass depth layers (only active when expanded)
-                if isExpanded {
-                    ZStack {
-                        HUDDesignTokens.Colors.obsidianBase.opacity(0.85)
-
-                        Rectangle()
-                            .fill(.ultraThinMaterial)
-                            .opacity(0.35)
-
-                        if enableAmbientGlow {
-                            // Ambient state glow positioned in the lower card body, NEVER in the notch zone
-                            RadialGradient(
-                                colors: [
-                                    stateColor.opacity(0.20),
-                                    stateColor.opacity(0.05),
-                                    Color.clear
-                                ],
-                                center: UnitPoint(x: 0.5, y: 0.75),
-                                startRadius: 10,
-                                endRadius: 200
-                            )
-                            .animation(.easeInOut(duration: 0.35), value: appState.state)
-                        }
-                    }
-                    // Mask: guarantees the top notch zone (y = 0..notchHeight) remains completely pure black
-                    .mask(
-                        VStack(spacing: 0) {
-                            // Top Notch Zone: 100% transparent mask, preserving pure black base
-                            Color.clear
-                                .frame(height: geometry.notchHeight)
-
-                            // Smooth 24pt feather transition from black notch into glass dropdown
-                            LinearGradient(
-                                colors: [Color.clear, Color.white],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(height: 24)
-
-                            // Fully revealed glass body below
-                            Color.white
-                        }
-                    )
-                }
-            }
-        )
-        .clipShape(
-            NotchShape(
-                topEarRadius: HUDDesignTokens.Geometry.closedEarRadius,
-                bottomCornerRadius: isExpanded ? HUDDesignTokens.Geometry.expandedBottomCornerRadius : HUDDesignTokens.Geometry.closedBottomCornerRadius
-            )
-        )
-        .overlay(
-            NotchBorderShape(
-                topEarRadius: HUDDesignTokens.Geometry.closedEarRadius,
-                bottomCornerRadius: isExpanded ? HUDDesignTokens.Geometry.expandedBottomCornerRadius : HUDDesignTokens.Geometry.closedBottomCornerRadius
-            )
-            .stroke(
-                HUDDesignTokens.Gradients.notchBorder(isExpanded: isExpanded),
-                lineWidth: isExpanded ? 0.85 : 1.2
-            )
-        )
+        .background(hudBackground)
+        .clipShape(hudNotchShape)
+        .overlay(hudBorder)
         .shadow(color: Color.black.opacity(isExpanded ? 0.50 : 0.50), radius: isExpanded ? 24 : 9, y: isExpanded ? 12 : 3.5)
         .shadow(color: isExpanded ? stateColor.opacity(0.14) : Color.clear, radius: 18, y: 14)
         .contentShape(Rectangle())
-        .onHover { hovering in
-            hoverTask?.cancel()
-            if hovering {
-                withAnimation(HUDDesignTokens.Springs.fluid) {
-                    self.isHovering = true
+        .onHover { handleHover($0) }
+        .onPreferenceChange(ContentHeightPreferenceKey.self) { handleHeightChange($0) }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .animation(HUDDesignTokens.Springs.fluid, value: isExpanded)
+        .animation(HUDDesignTokens.Springs.fluid, value: targetHeight)
+    }
+
+    // MARK: - Notch Silhouette Shape
+    private var hudNotchShape: NotchShape {
+        NotchShape(
+            topEarRadius: HUDDesignTokens.Geometry.closedEarRadius,
+            bottomCornerRadius: isExpanded ? HUDDesignTokens.Geometry.expandedBottomCornerRadius : HUDDesignTokens.Geometry.closedBottomCornerRadius
+        )
+    }
+
+    // MARK: - Background Architecture
+    @ViewBuilder
+    private var hudBackground: some View {
+        ZStack {
+            // True pitch-black base (#000000) - exact optical match to MacBook notch and iPhone Dynamic Island
+            HUDDesignTokens.Colors.notchBlack
+
+            // Rich obsidian liquid-glass depth layers (only active when expanded)
+            if isExpanded {
+                ZStack {
+                    HUDDesignTokens.Colors.obsidianBase.opacity(0.85)
+
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.35)
+
+                    if enableAmbientGlow {
+                        // Ambient state glow positioned in the lower card body, NEVER in the notch zone
+                        RadialGradient(
+                            colors: [
+                                stateColor.opacity(0.20),
+                                stateColor.opacity(0.05),
+                                Color.clear
+                            ],
+                            center: UnitPoint(x: 0.5, y: 0.75),
+                            startRadius: 10,
+                            endRadius: 200
+                        )
+                        .animation(.easeInOut(duration: 0.35), value: appState.state)
+                    }
                 }
-            } else {
-                hoverTask = Task {
-                    try? await Task.sleep(nanoseconds: 200_000_000)
-                    if !Task.isCancelled {
-                        await MainActor.run {
-                            withAnimation(HUDDesignTokens.Springs.fluid) {
-                                self.isHovering = false
-                            }
+                // Mask: guarantees the top notch zone (y = 0..notchHeight) remains completely pure black
+                .mask(
+                    VStack(spacing: 0) {
+                        // Top Notch Zone: 100% transparent mask, preserving pure black base
+                        Color.clear
+                            .frame(height: geometry.notchHeight)
+
+                        // Smooth 24pt feather transition from black notch into glass dropdown
+                        LinearGradient(
+                            colors: [Color.clear, Color.white],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 24)
+
+                        // Fully revealed glass body below
+                        Color.white
+                    }
+                )
+            }
+        }
+    }
+
+    // MARK: - Specular Border Overlay
+    private var hudBorder: some View {
+        NotchBorderShape(
+            topEarRadius: HUDDesignTokens.Geometry.closedEarRadius,
+            bottomCornerRadius: isExpanded ? HUDDesignTokens.Geometry.expandedBottomCornerRadius : HUDDesignTokens.Geometry.closedBottomCornerRadius
+        )
+        .stroke(
+            HUDDesignTokens.Gradients.notchBorder(isExpanded: isExpanded),
+            lineWidth: isExpanded ? 0.85 : 1.2
+        )
+    }
+
+    // MARK: - Event Handlers
+    private func handleHover(_ hovering: Bool) {
+        hoverTask?.cancel()
+        if hovering {
+            withAnimation(HUDDesignTokens.Springs.fluid) {
+                self.isHovering = true
+            }
+        } else {
+            hoverTask = Task {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        withAnimation(HUDDesignTokens.Springs.fluid) {
+                            self.isHovering = false
                         }
                     }
                 }
             }
         }
-        .onPreferenceChange(ContentHeightPreferenceKey.self) { newHeight in
-            if newHeight > 0 {
-                withAnimation(HUDDesignTokens.Springs.fluid) {
-                    self.inspectorContentHeight = newHeight
-                }
+    }
+
+    private func handleHeightChange(_ newHeight: CGFloat) {
+        if newHeight > 0 {
+            withAnimation(HUDDesignTokens.Springs.fluid) {
+                self.inspectorContentHeight = newHeight
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .animation(HUDDesignTokens.Springs.fluid, value: isExpanded)
-        .animation(HUDDesignTokens.Springs.fluid, value: targetHeight)
     }
 
     // MARK: - Top Notch Cap Bar
