@@ -1,0 +1,120 @@
+name: Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag or version to release (e.g. v1.0.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Package, Sign, Notarize & Release DMG
+    runs-on: macos-14
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.0.app || true
+          xcodebuild -version
+          swift --version
+
+      - name: Determine Release Tag
+        id: vars
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$(echo "$TAG" | sed 's/^v//')" >> $GITHUB_OUTPUT
+
+      - name: Import Apple Developer ID Certificate
+        if: env.HAS_APPLE_CERT == 'true'
+        env:
+          HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "==> Configuring temporary build keychain for Developer ID signing..."
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PWD=$(openssl rand -base64 24)
+
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security import $RUNNER_TEMP/certificate.p12 \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          echo "==> Successfully imported Developer ID Certificate into runner keychain."
+
+      - name: Prepare Apple Notarization Key
+        if: env.HAS_NOTARY_KEY == 'true'
+        env:
+          HAS_NOTARY_KEY: ${{ secrets.APPLE_API_KEY_BASE64 != '' }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          echo "==> Setting up App Store Connect API Key for xcrun notarytool..."
+          mkdir -p ~/.private_keys
+          NOTARY_KEY_PATH=~/.private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+          echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$NOTARY_KEY_PATH"
+
+          echo "NOTARY_KEY_PATH=$NOTARY_KEY_PATH" >> $GITHUB_ENV
+          echo "NOTARY_KEY_ID=$APPLE_API_KEY_ID" >> $GITHUB_ENV
+          echo "NOTARY_ISSUER=$APPLE_API_ISSUER" >> $GITHUB_ENV
+          echo "==> Notary credentials configured."
+
+      - name: Build and Package DMG
+        run: |
+          ./Scripts/create_dmg.sh release
+
+      - name: Extract Release Notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${{ steps.vars.outputs.version }}"
+          python3 -c "
+          import re, sys
+          version = sys.argv[1]
+          try:
+              with open('CHANGELOG.md', 'r') as f:
+                  content = f.read()
+              pattern = r'## \[' + re.escape(version) + r'\][^\n]*\n(.*?)(?=\n## \[|\Z)'
+              match = re.search(pattern, content, re.DOTALL)
+              if match and match.group(1).strip():
+                  print(match.group(1).strip())
+              else:
+                  print('Release ' + version)
+          except Exception:
+              print('Release ' + version)
+          " "$VERSION" > release_notes.md
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          gh release create "$TAG" build/Aura.dmg \
+            --title "Aura $TAG" \
+            --notes-file release_notes.md \
+            --latest

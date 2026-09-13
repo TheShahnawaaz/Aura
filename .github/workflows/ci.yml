@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-build:
+    name: Build & Test (macOS 14)
+    runs-on: macos-14
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.0.app || true
+          xcodebuild -version
+          swift --version
+
+      - name: Run Unit Tests
+        run: |
+          swift test --parallel
+
+      - name: Build Production Release Binary
+        run: |
+          swift build -c release

@@ -50,7 +50,7 @@ export const Navbar: React.FC = () => {
         {/* Action CTAs */}
         <div className="flex items-center gap-3">
           <a
-            href="https://github.com/shahnawaz/Aura"
+            href="https://github.com/TheShahnawaaz/Aura"
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 transition-all"

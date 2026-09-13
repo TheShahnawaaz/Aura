@@ -17,9 +17,14 @@ struct AuraApp: App {
                     NSApplication.shared.orderFrontStandardAboutPanel(
                         options: [
                             NSApplication.AboutPanelOptionKey.applicationName: "Aura",
-                            NSApplication.AboutPanelOptionKey.version: "0.1.0"
+                            NSApplication.AboutPanelOptionKey.version: AuraVersion.current,
+                            NSApplication.AboutPanelOptionKey.applicationVersion: AuraVersion.build
                         ]
                     )
+                }
+
+                Button("Check for Updates...") {
+                    UpdateService.shared.checkForUpdates(userInitiated: true)
                 }
             }
 

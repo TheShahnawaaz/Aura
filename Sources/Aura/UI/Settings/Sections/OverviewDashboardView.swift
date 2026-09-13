@@ -4,6 +4,7 @@ import SwiftUI
 /// interactive connection test, and live audio monitoring.
 public struct OverviewDashboardView: View {
     @ObservedObject public var appState: AppState
+    @ObservedObject private var updateService = UpdateService.shared
 
     @State private var isTestingModel: Bool = false
     @State private var testResult: TestResult? = nil
@@ -35,21 +36,55 @@ public struct OverviewDashboardView: View {
 
                     Spacer()
 
-                    // Engine Status Pill
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(stateColor)
-                            .frame(width: 7, height: 7)
-                            .shadow(color: stateColor.opacity(0.8), radius: 3)
-
-                        Text("60 FPS ENGINE")
+                    HStack(spacing: 8) {
+                        // Version Badge
+                        Text("v\(AuraVersion.current)")
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.75))
+                            .foregroundColor(.cyan)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.cyan.opacity(0.12))
+                            .cornerRadius(6)
+
+                        // Check for Updates Button
+                        Button(action: {
+                            updateService.checkForUpdates(userInitiated: true)
+                        }) {
+                            HStack(spacing: 5) {
+                                if updateService.isChecking {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                } else {
+                                    Image(systemName: updateService.isUpdateAvailable ? "arrow.down.circle.fill" : "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 10))
+                                }
+                                Text(updateService.isChecking ? "Checking..." : (updateService.isUpdateAvailable ? "Update" : "Updates"))
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundColor(updateService.isUpdateAvailable ? .yellow : .white.opacity(0.8))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(updateService.isUpdateAvailable ? Color.yellow.opacity(0.15) : Color.white.opacity(0.06))
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+
+                        // Engine Status Pill
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(stateColor)
+                                .frame(width: 7, height: 7)
+                                .shadow(color: stateColor.opacity(0.8), radius: 3)
+
+                            Text("60 FPS ENGINE")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.75))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(6)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.06))
-                    .cornerRadius(6)
                 }
 
                 // Hero Card with Living Aurora Orb

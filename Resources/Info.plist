@@ -2,39 +2,39 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
-    <key>CFBundleExecutable</key>
-    <string>Aura</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.aura.mac</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>Aura</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>CFBundleIconName</key>
-    <string>AppIcon</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
-    <key>LSUIElement</key>
-    <false/>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Aura needs microphone access to listen to your voice commands and transcribe speech.</string>
-    <key>NSAppleEventsUsageDescription</key>
-    <string>Aura uses AppleEvents to orchestrate native macOS apps like Safari, Notes, and Finder.</string>
-    <key>NSAccessibilityUsageDescription</key>
-    <string>Aura uses accessibility features to inspect context and automate user workflows.</string>
-    <key>NSSpeechRecognitionUsageDescription</key>
-    <string>Aura uses Apple speech recognition to transcribe your spoken words into actions in real time.</string>
-    <key>NSScreenCaptureUsageDescription</key>
-    <string>Aura needs screen capture access to observe your screen and take screenshots on your command.</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>Aura</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.aura.mac</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Aura</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<false/>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>Aura uses accessibility features to inspect context and automate user workflows.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Aura uses AppleEvents to orchestrate native macOS apps like Safari, Notes, and Finder.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Aura needs microphone access to listen to your voice commands and transcribe speech.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Aura needs screen capture access to observe your screen and take screenshots on your command.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Aura uses Apple speech recognition to transcribe your spoken words into actions in real time.</string>
 </dict>
 </plist>

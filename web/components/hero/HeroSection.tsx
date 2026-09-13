@@ -43,7 +43,7 @@ export const HeroSection: React.FC = () => {
         </a>
 
         <a
-          href="https://github.com/shahnawaz/Aura"
+          href="https://github.com/TheShahnawaaz/Aura"
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-[#11131a] border border-white/[0.08] hover:border-white/20 text-slate-300 font-mono text-xs transition-all hover:bg-[#161822]"

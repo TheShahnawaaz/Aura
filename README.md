@@ -82,7 +82,7 @@ graph TD
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/<your-username>/Aura.git
+git clone https://github.com/TheShahnawaaz/Aura.git
 cd Aura
 ```
 
@@ -92,12 +92,18 @@ To build an incremental development bundle:
 ./Scripts/bundle_app.sh debug
 ```
 
-To build an optimized production release bundle:
+To build an optimized production release bundle and package a distributable DMG:
 ```bash
-./Scripts/bundle_app.sh release
+./Scripts/create_dmg.sh release
 ```
 
-### 3. Run Aura
+### 3. Version Management
+To bump the application version and automatically sync `VERSION`, `Info.plist`, `AuraVersion.swift`, and `web/package.json`:
+```bash
+./Scripts/bump_version.sh <new_version|patch|minor|major>
+```
+
+### 4. Run Aura
 ```bash
 open build/Aura.app
 ```

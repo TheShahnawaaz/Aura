@@ -41,13 +41,21 @@ export const DownloadSection: React.FC = () => {
         </p>
 
         {/* Download Action Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-4 mb-8">
+        <div className="flex flex-col items-center justify-center gap-3 mb-8">
           <a
-            href="https://github.com/shahnawaz/Aura/releases"
+            href="https://github.com/TheShahnawaaz/Aura/releases/latest/download/Aura.dmg"
             className="flex items-center gap-2.5 px-8 py-4 rounded-2xl bg-white text-black font-bold text-sm shadow-xl hover:bg-slate-100 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <Apple className="w-5 h-5 fill-current" />
             <span>Download for Mac (.dmg)</span>
+          </a>
+          <a
+            href="https://github.com/TheShahnawaaz/Aura/releases"
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-slate-400 hover:text-white transition-colors"
+          >
+            View Changelog & All Releases →
           </a>
         </div>
 

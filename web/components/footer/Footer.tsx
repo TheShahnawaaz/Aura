@@ -27,7 +27,7 @@ export const Footer: React.FC = () => {
         {/* Links */}
         <div className="flex items-center gap-6 font-medium text-slate-400">
           <a
-            href="https://github.com/shahnawaz/Aura"
+            href="https://github.com/TheShahnawaaz/Aura"
             target="_blank"
             rel="noreferrer"
             className="hover:text-white transition-colors"
@@ -43,7 +43,7 @@ export const Footer: React.FC = () => {
             OpenAgentSDK
           </a>
           <a
-            href="https://github.com/shahnawaz/Aura/blob/main/LICENSE"
+            href="https://github.com/TheShahnawaaz/Aura/blob/main/LICENSE"
             target="_blank"
             rel="noreferrer"
             className="hover:text-white transition-colors"
