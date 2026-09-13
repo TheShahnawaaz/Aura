@@ -128,27 +128,30 @@ public struct NotchHUDView: View {
         .frame(width: targetWidth, height: targetHeight, alignment: .top)
         .background(
             ZStack {
-                // Deep obsidian space base
-                HUDDesignTokens.Colors.obsidianBase.opacity(0.96)
+                // True pitch-black base (#000000) - exact optical match to MacBook notch and iPhone Dynamic Island
+                HUDDesignTokens.Colors.notchBlack
 
-                // Native ultra-thin glass material
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.38)
+                // Rich obsidian liquid-glass depth layers (only active when expanded)
+                if isExpanded {
+                    HUDDesignTokens.Colors.obsidianBase.opacity(0.85)
 
-                // Dynamic ambient state back-glow
-                if enableAmbientGlow && isExpanded {
-                    RadialGradient(
-                        colors: [
-                            stateColor.opacity(0.18),
-                            stateColor.opacity(0.04),
-                            Color.clear
-                        ],
-                        center: .top,
-                        startRadius: 0,
-                        endRadius: 220
-                    )
-                    .animation(.easeInOut(duration: 0.35), value: appState.state)
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.35)
+
+                    if enableAmbientGlow {
+                        RadialGradient(
+                            colors: [
+                                stateColor.opacity(0.18),
+                                stateColor.opacity(0.04),
+                                Color.clear
+                            ],
+                            center: .top,
+                            startRadius: 0,
+                            endRadius: 220
+                        )
+                        .animation(.easeInOut(duration: 0.35), value: appState.state)
+                    }
                 }
             }
         )
@@ -163,9 +166,12 @@ public struct NotchHUDView: View {
                 topEarRadius: HUDDesignTokens.Geometry.closedEarRadius,
                 bottomCornerRadius: isExpanded ? HUDDesignTokens.Geometry.expandedBottomCornerRadius : HUDDesignTokens.Geometry.closedBottomCornerRadius
             )
-            .stroke(HUDDesignTokens.Gradients.notchBorder(isExpanded: isExpanded), lineWidth: 0.75)
+            .stroke(
+                HUDDesignTokens.Gradients.notchBorder(isExpanded: isExpanded),
+                lineWidth: isExpanded ? 0.85 : 1.2
+            )
         )
-        .shadow(color: Color.black.opacity(isExpanded ? 0.50 : 0.0), radius: isExpanded ? 24 : 0, y: isExpanded ? 10 : 0)
+        .shadow(color: Color.black.opacity(isExpanded ? 0.50 : 0.50), radius: isExpanded ? 24 : 9, y: isExpanded ? 10 : 3.5)
         .shadow(color: isExpanded ? stateColor.opacity(0.12) : Color.clear, radius: 18, y: 6)
         .contentShape(Rectangle())
         .onHover { hovering in
@@ -352,11 +358,11 @@ public struct NotchHUDView: View {
             .padding(.vertical, 3.5)
             .background(
                 Capsule()
-                    .fill(Color.white.opacity(0.08))
+                    .fill(Color.white.opacity(isHovering ? 0.12 : 0.06))
             )
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.12), lineWidth: 0.5)
+                    .stroke(Color.white.opacity(isHovering ? 0.18 : 0.08), lineWidth: 0.5)
             )
         }
         .menuStyle(.borderlessButton)

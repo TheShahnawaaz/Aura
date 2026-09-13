@@ -6,7 +6,10 @@ public enum HUDDesignTokens {
 
     // MARK: - Colors
     public enum Colors {
-        /// Deep obsidian space base color for the notch container
+        /// True pitch black (#000000) matching Apple's hardware notch and iPhone Dynamic Island
+        public static let notchBlack = Color.black
+
+        /// Deep obsidian space base color for the notch container when expanded
         public static let obsidianBase = Color(red: 0.035, green: 0.038, blue: 0.046)
 
         /// Semi-transparent dark surface fill for elevated glass cards
@@ -32,17 +35,29 @@ public enum HUDDesignTokens {
 
     // MARK: - Gradients
     public enum Gradients {
-        /// Outer notch specular border gradient
+        /// Outer notch specular border gradient (subtle highlight when expanded, crisp prominent contour rim when resting)
         public static func notchBorder(isExpanded: Bool) -> LinearGradient {
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(isExpanded ? 0.24 : 0.10),
-                    Color.white.opacity(isExpanded ? 0.08 : 0.03),
-                    Color.clear
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            if isExpanded {
+                return LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.35),
+                        Color.white.opacity(0.15),
+                        Color.white.opacity(0.08)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            } else {
+                return LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.65),
+                        Color.white.opacity(0.48),
+                        Color.white.opacity(0.28)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
         }
 
         /// Inner glass card specular edge gradient
