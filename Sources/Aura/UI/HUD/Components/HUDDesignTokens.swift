@@ -40,9 +40,10 @@ public enum HUDDesignTokens {
             if isExpanded {
                 return LinearGradient(
                     colors: [
-                        Color.white.opacity(0.35),
-                        Color.white.opacity(0.15),
-                        Color.white.opacity(0.08)
+                        Color.clear,
+                        Color.white.opacity(0.12),
+                        Color.white.opacity(0.24),
+                        Color.white.opacity(0.16)
                     ],
                     startPoint: .top,
                     endPoint: .bottom

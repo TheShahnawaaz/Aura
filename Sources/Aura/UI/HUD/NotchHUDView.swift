@@ -133,25 +133,47 @@ public struct NotchHUDView: View {
 
                 // Rich obsidian liquid-glass depth layers (only active when expanded)
                 if isExpanded {
-                    HUDDesignTokens.Colors.obsidianBase.opacity(0.85)
+                    ZStack {
+                        HUDDesignTokens.Colors.obsidianBase.opacity(0.85)
 
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.35)
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .opacity(0.35)
 
-                    if enableAmbientGlow {
-                        RadialGradient(
-                            colors: [
-                                stateColor.opacity(0.18),
-                                stateColor.opacity(0.04),
-                                Color.clear
-                            ],
-                            center: .top,
-                            startRadius: 0,
-                            endRadius: 220
-                        )
-                        .animation(.easeInOut(duration: 0.35), value: appState.state)
+                        if enableAmbientGlow {
+                            // Ambient state glow positioned in the lower card body, NEVER in the notch zone
+                            RadialGradient(
+                                colors: [
+                                    stateColor.opacity(0.20),
+                                    stateColor.opacity(0.05),
+                                    Color.clear
+                                ],
+                                center: UnitPoint(x: 0.5, y: 0.75),
+                                startRadius: 10,
+                                endRadius: 200
+                            )
+                            .animation(.easeInOut(duration: 0.35), value: appState.state)
+                        }
                     }
+                    // Mask: guarantees the top notch zone (y = 0..notchHeight) remains completely pure black
+                    .mask(
+                        VStack(spacing: 0) {
+                            // Top Notch Zone: 100% transparent mask, preserving pure black base
+                            Color.clear
+                                .frame(height: geometry.notchHeight)
+
+                            // Smooth 24pt feather transition from black notch into glass dropdown
+                            LinearGradient(
+                                colors: [Color.clear, Color.white],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 24)
+
+                            // Fully revealed glass body below
+                            Color.white
+                        }
+                    )
                 }
             }
         )
@@ -171,8 +193,8 @@ public struct NotchHUDView: View {
                 lineWidth: isExpanded ? 0.85 : 1.2
             )
         )
-        .shadow(color: Color.black.opacity(isExpanded ? 0.50 : 0.50), radius: isExpanded ? 24 : 9, y: isExpanded ? 10 : 3.5)
-        .shadow(color: isExpanded ? stateColor.opacity(0.12) : Color.clear, radius: 18, y: 6)
+        .shadow(color: Color.black.opacity(isExpanded ? 0.50 : 0.50), radius: isExpanded ? 24 : 9, y: isExpanded ? 12 : 3.5)
+        .shadow(color: isExpanded ? stateColor.opacity(0.14) : Color.clear, radius: 18, y: 14)
         .contentShape(Rectangle())
         .onHover { hovering in
             hoverTask?.cancel()
