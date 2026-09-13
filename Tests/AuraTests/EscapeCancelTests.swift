@@ -2,17 +2,19 @@ import XCTest
 @testable import Aura
 
 final class EscapeCancelTests: XCTestCase {
-    @MainActor
-    override func setUp() async throws {
-        try await super.setUp()
-        AppState.shared.resetToIdle()
+    override func setUp() {
+        super.setUp()
+        MainActor.assumeIsolated {
+            AppState.shared.resetToIdle()
+        }
     }
 
-    @MainActor
-    override func tearDown() async throws {
-        AppState.shared.resetToIdle()
-        HotkeyManager.shared.disarmEscapeHotkey()
-        try await super.tearDown()
+    override func tearDown() {
+        MainActor.assumeIsolated {
+            AppState.shared.resetToIdle()
+            HotkeyManager.shared.disarmEscapeHotkey()
+        }
+        super.tearDown()
     }
 
     func testCancelRecognitionOnNativeSpeechRecognizer() {
