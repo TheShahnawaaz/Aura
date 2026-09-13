@@ -24,8 +24,33 @@ public struct DiscoveredModel: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-/// Service that dynamically queries provider APIs to discover available models,
-/// filtering out non-conversational capabilities (e.g. text-to-speech, speech-to-text, embeddings).
+public enum ModelDiscoveryError: LocalizedError {
+    case missingApiKey(provider: String)
+    case invalidEndpoint(String)
+    case invalidResponse(status: Int, message: String)
+    case networkError(String)
+    case noModelsDiscovered(provider: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingApiKey(let provider):
+            return "Please enter a valid \(provider) API key."
+        case .invalidEndpoint(let url):
+            return "Invalid endpoint URL: \(url)"
+        case .invalidResponse(status: let status, message: let message):
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "\(status) error: \(trimmed.isEmpty ? "Request failed" : trimmed)"
+        case .networkError(let msg):
+            return "Network error: \(msg)"
+        case .noModelsDiscovered(let provider):
+            return "No conversational models found for \(provider)."
+        }
+    }
+}
+
+/// Actor responsible for dynamically querying models from cloud or local AI providers.
+/// Enforces a strict ZERO-FALLBACK policy (matching VoiceDiscoveryService):
+/// if an API key or endpoint fails, errors are thrown and NO fake models are returned.
 public actor ModelDiscoveryService {
     public static let shared = ModelDiscoveryService()
 
@@ -34,7 +59,7 @@ public actor ModelDiscoveryService {
 
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 8.0
+        config.timeoutIntervalForRequest = 10.0
         self.session = URLSession(configuration: config)
     }
 
@@ -52,15 +77,25 @@ public actor ModelDiscoveryService {
         return true
     }
 
-    /// Fetches all text-generation & reasoning capable models for the given provider.
+    /// Clears the discovery cache.
+    public func clearCache() {
+        cache.removeAll()
+    }
+
+    /// Dynamically fetches all text-generation & reasoning models for the given provider.
+    /// Strictly throws on errors with zero hardcoded fallbacks.
     public func fetchModels(
         provider: String,
         apiKey: String?,
-        customBaseURL: String? = nil
-    ) async -> [DiscoveredModel] {
+        customBaseURL: String? = nil,
+        forceRefresh: Bool = false
+    ) async throws -> [DiscoveredModel] {
         let config = ProviderRegistry.shared.find(idOrName: provider)
-        let cacheKey = "\(config.providerId)_\(apiKey?.prefix(6) ?? "")"
-        if let cached = cache[cacheKey], !cached.isEmpty {
+        let trimmedKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let trimmedURL = customBaseURL?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let cacheKey = "\(config.providerId)_\(trimmedURL)_\(trimmedKey.prefix(8))"
+
+        if !forceRefresh, let cached = cache[cacheKey], !cached.isEmpty {
             return cached
         }
 
@@ -68,45 +103,59 @@ public actor ModelDiscoveryService {
 
         switch config.providerId {
         case "gemini":
-            discovered = await fetchGeminiModels(apiKey: apiKey)
+            discovered = try await fetchGeminiModels(apiKey: trimmedKey)
         case "openai":
-            discovered = await fetchOpenAICompatibleModels(
-                baseURL: customBaseURL ?? config.defaultBaseURL,
-                apiKey: apiKey,
-                providerDisplayName: "OpenAI"
+            discovered = try await fetchOpenAICompatibleModels(
+                baseURL: !trimmedURL.isEmpty ? trimmedURL : config.defaultBaseURL,
+                apiKey: trimmedKey,
+                providerDisplayName: "OpenAI",
+                requireKey: true
             )
         case "groq":
-            discovered = await fetchOpenAICompatibleModels(
+            discovered = try await fetchOpenAICompatibleModels(
                 baseURL: config.defaultBaseURL,
-                apiKey: apiKey,
-                providerDisplayName: "Groq"
+                apiKey: trimmedKey,
+                providerDisplayName: "Groq",
+                requireKey: true
             )
         case "deepseek":
-            discovered = await fetchOpenAICompatibleModels(
+            discovered = try await fetchOpenAICompatibleModels(
                 baseURL: config.defaultBaseURL,
-                apiKey: apiKey,
-                providerDisplayName: "DeepSeek"
+                apiKey: trimmedKey,
+                providerDisplayName: "DeepSeek",
+                requireKey: true
             )
         case "mistral":
-            discovered = await fetchOpenAICompatibleModels(
+            discovered = try await fetchOpenAICompatibleModels(
                 baseURL: config.defaultBaseURL,
-                apiKey: apiKey,
-                providerDisplayName: "Mistral AI"
+                apiKey: trimmedKey,
+                providerDisplayName: "Mistral AI",
+                requireKey: true
             )
         case "anthropic":
-            discovered = await fetchAnthropicModels(apiKey: apiKey)
+            discovered = try await fetchAnthropicModels(apiKey: trimmedKey)
         case "ollama":
-            discovered = await fetchOllamaModels(baseURL: customBaseURL)
+            discovered = try await fetchOllamaModels(baseURL: !trimmedURL.isEmpty ? trimmedURL : config.defaultBaseURL)
+        case "custom":
+            let effectiveURL = !trimmedURL.isEmpty ? trimmedURL : config.defaultBaseURL
+            discovered = try await fetchOpenAICompatibleModels(
+                baseURL: effectiveURL,
+                apiKey: trimmedKey,
+                providerDisplayName: "Custom / OpenAI-Compatible",
+                requireKey: false
+            )
         default:
-            discovered = await fetchOpenAICompatibleModels(
-                baseURL: customBaseURL ?? config.defaultBaseURL,
-                apiKey: apiKey,
-                providerDisplayName: config.displayName
+            let effectiveURL = !trimmedURL.isEmpty ? trimmedURL : config.defaultBaseURL
+            discovered = try await fetchOpenAICompatibleModels(
+                baseURL: effectiveURL,
+                apiKey: trimmedKey,
+                providerDisplayName: config.displayName,
+                requireKey: config.requiresApiKey
             )
         }
 
-        if discovered.isEmpty {
-            discovered = fallbackModels(for: config.providerId)
+        guard !discovered.isEmpty else {
+            throw ModelDiscoveryError.noModelsDiscovered(provider: config.displayName)
         }
 
         cache[cacheKey] = discovered
@@ -114,254 +163,273 @@ public actor ModelDiscoveryService {
     }
 
     // MARK: - Google Gemini API Discovery
-    private func fetchGeminiModels(apiKey: String?) async -> [DiscoveredModel] {
-        guard let key = apiKey, !key.isEmpty else {
-            return fallbackModels(for: "gemini")
+    private func fetchGeminiModels(apiKey: String) async throws -> [DiscoveredModel] {
+        guard !apiKey.isEmpty else {
+            throw ModelDiscoveryError.missingApiKey(provider: "Google Gemini")
         }
 
-        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models?key=\(key)") else {
-            return fallbackModels(for: "gemini")
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models?key=\(apiKey)") else {
+            throw ModelDiscoveryError.invalidEndpoint("Google Gemini API")
         }
 
+        let data: Data
+        let response: URLResponse
         do {
-            let (data, response) = try await session.data(from: url)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                return fallbackModels(for: "gemini")
-            }
-
-            struct GeminiListResponse: Codable {
-                struct GeminiModelItem: Codable {
-                    let name: String
-                    let displayName: String?
-                    let supportedGenerationMethods: [String]?
-                    let inputTokenLimit: Int?
-                }
-                let models: [GeminiModelItem]?
-            }
-
-            let decoded = try JSONDecoder().decode(GeminiListResponse.self, from: data)
-            guard let rawModels = decoded.models else {
-                return fallbackModels(for: "gemini")
-            }
-
-            var results: [DiscoveredModel] = []
-            for m in rawModels {
-                let id = m.name.replacingOccurrences(of: "models/", with: "")
-                guard Self.isChatAndReasoningModel(modelId: id) else { continue }
-
-                if let methods = m.supportedGenerationMethods, !methods.contains("generateContent") {
-                    continue
-                }
-
-                let isRecommended = id.contains("gemini-2.5-flash") || id.contains("gemini-1.5-flash")
-                let display = m.displayName ?? id
-
-                results.append(DiscoveredModel(
-                    modelId: id,
-                    displayName: isRecommended ? "\(display) (Recommended)" : display,
-                    provider: "Google Gemini",
-                    contextWindow: m.inputTokenLimit,
-                    isRecommended: isRecommended
-                ))
-            }
-
-            return results.sorted { ($0.isRecommended ? 0 : 1) < ($1.isRecommended ? 0 : 1) }
+            (data, response) = try await session.data(from: url)
         } catch {
-            return fallbackModels(for: "gemini")
+            throw ModelDiscoveryError.networkError(error.localizedDescription)
         }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw ModelDiscoveryError.networkError("Invalid response from Google Gemini.")
+        }
+
+        guard http.statusCode == 200 else {
+            let errString = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+            throw ModelDiscoveryError.invalidResponse(status: http.statusCode, message: errString)
+        }
+
+        struct GeminiListResponse: Codable {
+            struct GeminiModelItem: Codable {
+                let name: String
+                let displayName: String?
+                let supportedGenerationMethods: [String]?
+                let inputTokenLimit: Int?
+            }
+            let models: [GeminiModelItem]?
+        }
+
+        let decoded: GeminiListResponse
+        do {
+            decoded = try JSONDecoder().decode(GeminiListResponse.self, from: data)
+        } catch {
+            throw ModelDiscoveryError.invalidResponse(status: 200, message: "Failed to parse Gemini model response.")
+        }
+
+        guard let rawModels = decoded.models else {
+            return []
+        }
+
+        var results: [DiscoveredModel] = []
+        for m in rawModels {
+            let id = m.name.replacingOccurrences(of: "models/", with: "")
+            guard Self.isChatAndReasoningModel(modelId: id) else { continue }
+
+            if let methods = m.supportedGenerationMethods, !methods.contains("generateContent") {
+                continue
+            }
+
+            let isRecommended = id.contains("flash")
+            let display = m.displayName ?? id
+
+            results.append(DiscoveredModel(
+                modelId: id,
+                displayName: isRecommended ? "\(display) (Recommended)" : display,
+                provider: "Google Gemini",
+                contextWindow: m.inputTokenLimit,
+                isRecommended: isRecommended
+            ))
+        }
+
+        return results.sorted { ($0.isRecommended ? 0 : 1) < ($1.isRecommended ? 0 : 1) }
     }
 
-    // MARK: - Generic OpenAI-Compatible Discovery (OpenAI, Groq, DeepSeek, Mistral, Custom)
+    // MARK: - Generic OpenAI-Compatible Discovery (OpenAI, Groq, DeepSeek, Mistral, Custom / Proxy)
     private func fetchOpenAICompatibleModels(
         baseURL: String,
-        apiKey: String?,
-        providerDisplayName: String
-    ) async -> [DiscoveredModel] {
-        let base = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard let url = URL(string: "\(base)/models") else {
-            return fallbackModels(for: providerDisplayName)
+        apiKey: String,
+        providerDisplayName: String,
+        requireKey: Bool
+    ) async throws -> [DiscoveredModel] {
+        if requireKey && apiKey.isEmpty {
+            throw ModelDiscoveryError.missingApiKey(provider: providerDisplayName)
+        }
+
+        let trimmedBase = baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let endpointStr = trimmedBase.hasSuffix("/models") ? trimmedBase : "\(trimmedBase)/models"
+
+        guard let url = URL(string: endpointStr) else {
+            throw ModelDiscoveryError.invalidEndpoint(endpointStr)
         }
 
         var request = URLRequest(url: url)
-        if let key = apiKey, !key.isEmpty {
-            request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.httpMethod = "GET"
+        if !apiKey.isEmpty {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
 
+        let data: Data
+        let response: URLResponse
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                return fallbackModels(for: providerDisplayName)
-            }
-
-            struct OpenAIListResponse: Codable {
-                struct OpenAIModelItem: Codable {
-                    let id: String
-                }
-                let data: [OpenAIModelItem]?
-            }
-
-            let decoded = try JSONDecoder().decode(OpenAIListResponse.self, from: data)
-            guard let rawModels = decoded.data else {
-                return fallbackModels(for: providerDisplayName)
-            }
-
-            var results: [DiscoveredModel] = []
-            for m in rawModels {
-                let id = m.id
-                guard Self.isChatAndReasoningModel(modelId: id) else { continue }
-
-                let isRecommended = id.contains("gpt-4o-mini") ||
-                                    id.contains("llama-3.3-70b") ||
-                                    id.contains("deepseek-chat") ||
-                                    id.contains("mistral-large")
-
-                results.append(DiscoveredModel(
-                    modelId: id,
-                    displayName: isRecommended ? "\(id) (Recommended)" : id,
-                    provider: providerDisplayName,
-                    isRecommended: isRecommended
-                ))
-            }
-
-            return results.sorted { ($0.isRecommended ? 0 : 1) < ($1.isRecommended ? 0 : 1) }
+            (data, response) = try await session.data(for: request)
         } catch {
-            return fallbackModels(for: providerDisplayName)
+            throw ModelDiscoveryError.networkError(error.localizedDescription)
         }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw ModelDiscoveryError.networkError("Invalid response from server.")
+        }
+
+        guard (200...299).contains(http.statusCode) else {
+            let errString = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+            throw ModelDiscoveryError.invalidResponse(status: http.statusCode, message: errString)
+        }
+
+        struct OpenAIListResponse: Codable {
+            struct OpenAIModelItem: Codable {
+                let id: String
+            }
+            let data: [OpenAIModelItem]?
+        }
+
+        let decoded: OpenAIListResponse
+        do {
+            decoded = try JSONDecoder().decode(OpenAIListResponse.self, from: data)
+        } catch {
+            throw ModelDiscoveryError.invalidResponse(status: http.statusCode, message: "Unexpected model response schema.")
+        }
+
+        guard let rawModels = decoded.data else {
+            return []
+        }
+
+        var results: [DiscoveredModel] = []
+        for m in rawModels {
+            let id = m.id
+            guard Self.isChatAndReasoningModel(modelId: id) else { continue }
+
+            let isRecommended = id.contains("flash") ||
+                                id.contains("gpt-4o-mini") ||
+                                id.contains("llama-3.3-70b") ||
+                                id.contains("deepseek-chat") ||
+                                id.contains("sonnet")
+
+            results.append(DiscoveredModel(
+                modelId: id,
+                displayName: isRecommended ? "\(id) (Recommended)" : id,
+                provider: providerDisplayName,
+                isRecommended: isRecommended
+            ))
+        }
+
+        return results.sorted { ($0.isRecommended ? 0 : 1) < ($1.isRecommended ? 0 : 1) }
     }
 
     // MARK: - Anthropic Claude Discovery
-    private func fetchAnthropicModels(apiKey: String?) async -> [DiscoveredModel] {
-        guard let key = apiKey, !key.isEmpty else {
-            return fallbackModels(for: "anthropic")
+    private func fetchAnthropicModels(apiKey: String) async throws -> [DiscoveredModel] {
+        guard !apiKey.isEmpty else {
+            throw ModelDiscoveryError.missingApiKey(provider: "Anthropic Claude")
         }
 
         guard let url = URL(string: "https://api.anthropic.com/v1/models") else {
-            return fallbackModels(for: "anthropic")
+            throw ModelDiscoveryError.invalidEndpoint("Anthropic API")
         }
 
         var request = URLRequest(url: url)
-        request.setValue(key, forHTTPHeaderField: "x-api-key")
+        request.httpMethod = "GET"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
+        let data: Data
+        let response: URLResponse
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                return fallbackModels(for: "anthropic")
-            }
-
-            struct AnthropicListResponse: Codable {
-                struct AnthropicModelItem: Codable {
-                    let id: String
-                    let display_name: String?
-                }
-                let data: [AnthropicModelItem]?
-            }
-
-            let decoded = try JSONDecoder().decode(AnthropicListResponse.self, from: data)
-            guard let rawModels = decoded.data else {
-                return fallbackModels(for: "anthropic")
-            }
-
-            var results: [DiscoveredModel] = []
-            for m in rawModels {
-                let id = m.id
-                let isRecommended = id.contains("3-5-sonnet") || id.contains("3-7-sonnet")
-                let display = m.display_name ?? id
-                results.append(DiscoveredModel(
-                    modelId: id,
-                    displayName: isRecommended ? "\(display) (Recommended)" : display,
-                    provider: "Anthropic Claude",
-                    isRecommended: isRecommended
-                ))
-            }
-
-            return results.sorted { ($0.isRecommended ? 0 : 1) < ($1.isRecommended ? 0 : 1) }
+            (data, response) = try await session.data(for: request)
         } catch {
-            return fallbackModels(for: "anthropic")
+            throw ModelDiscoveryError.networkError(error.localizedDescription)
         }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw ModelDiscoveryError.networkError("Invalid response from Anthropic.")
+        }
+
+        guard (200...299).contains(http.statusCode) else {
+            let errString = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+            throw ModelDiscoveryError.invalidResponse(status: http.statusCode, message: errString)
+        }
+
+        struct AnthropicListResponse: Codable {
+            struct AnthropicModelItem: Codable {
+                let id: String
+                let display_name: String?
+            }
+            let data: [AnthropicModelItem]?
+        }
+
+        let decoded: AnthropicListResponse
+        do {
+            decoded = try JSONDecoder().decode(AnthropicListResponse.self, from: data)
+        } catch {
+            throw ModelDiscoveryError.invalidResponse(status: http.statusCode, message: "Failed to parse Claude model response.")
+        }
+
+        guard let rawModels = decoded.data else {
+            return []
+        }
+
+        var results: [DiscoveredModel] = []
+        for m in rawModels {
+            let id = m.id
+            let isRecommended = id.contains("sonnet")
+            let display = m.display_name ?? id
+            results.append(DiscoveredModel(
+                modelId: id,
+                displayName: isRecommended ? "\(display) (Recommended)" : display,
+                provider: "Anthropic Claude",
+                isRecommended: isRecommended
+            ))
+        }
+
+        return results.sorted { ($0.isRecommended ? 0 : 1) < ($1.isRecommended ? 0 : 1) }
     }
 
     // MARK: - Ollama Local Discovery
-    private func fetchOllamaModels(baseURL: String?) async -> [DiscoveredModel] {
+    private func fetchOllamaModels(baseURL: String?) async throws -> [DiscoveredModel] {
         let base = baseURL?.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? "http://localhost:11434"
         guard let url = URL(string: "\(base)/api/tags") else {
-            return fallbackModels(for: "ollama")
+            throw ModelDiscoveryError.invalidEndpoint(base)
         }
 
+        let data: Data
+        let response: URLResponse
         do {
-            let (data, response) = try await session.data(from: url)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                return fallbackModels(for: "ollama")
-            }
-
-            struct OllamaListResponse: Codable {
-                struct OllamaModelItem: Codable {
-                    let name: String
-                }
-                let models: [OllamaModelItem]?
-            }
-
-            let decoded = try JSONDecoder().decode(OllamaListResponse.self, from: data)
-            guard let raw = decoded.models, !raw.isEmpty else {
-                return fallbackModels(for: "ollama")
-            }
-
-            return raw.map {
-                DiscoveredModel(
-                    modelId: $0.name,
-                    displayName: $0.name,
-                    provider: "Ollama (Local)"
-                )
-            }
+            (data, response) = try await session.data(from: url)
         } catch {
-            return fallbackModels(for: "ollama")
+            throw ModelDiscoveryError.networkError(error.localizedDescription)
         }
-    }
 
-    // MARK: - Fallback Presets
-    public nonisolated func fallbackModels(for providerIdOrName: String) -> [DiscoveredModel] {
-        let config = ProviderRegistry.shared.find(idOrName: providerIdOrName)
+        guard let http = response as? HTTPURLResponse else {
+            throw ModelDiscoveryError.networkError("Invalid response from Ollama.")
+        }
 
-        switch config.providerId {
-        case "gemini":
-            return [
-                DiscoveredModel(modelId: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash (Recommended)", provider: "Google Gemini", isRecommended: true),
-                DiscoveredModel(modelId: "gemini-2.5-flash-lite", displayName: "Gemini 2.5 Flash-Lite (Fast)", provider: "Google Gemini"),
-                DiscoveredModel(modelId: "gemini-2.5-pro", displayName: "Gemini 2.5 Pro (Deep Reasoning)", provider: "Google Gemini"),
-                DiscoveredModel(modelId: "gemini-1.5-flash", displayName: "Gemini 1.5 Flash", provider: "Google Gemini")
-            ]
-        case "openai":
-            return [
-                DiscoveredModel(modelId: "gpt-4o-mini", displayName: "GPT-4o Mini (Recommended)", provider: "OpenAI", isRecommended: true),
-                DiscoveredModel(modelId: "gpt-4o", displayName: "GPT-4o (Flagship)", provider: "OpenAI"),
-                DiscoveredModel(modelId: "o3-mini", displayName: "o3-mini (Reasoning)", provider: "OpenAI")
-            ]
-        case "groq":
-            return [
-                DiscoveredModel(modelId: "llama-3.3-70b-versatile", displayName: "Llama 3.3 70B (Recommended)", provider: "Groq", isRecommended: true),
-                DiscoveredModel(modelId: "mixtral-8x7b-32768", displayName: "Mixtral 8x7B", provider: "Groq"),
-                DiscoveredModel(modelId: "deepseek-r1-distill-llama-70b", displayName: "DeepSeek R1 Distill 70B", provider: "Groq")
-            ]
-        case "deepseek":
-            return [
-                DiscoveredModel(modelId: "deepseek-chat", displayName: "DeepSeek-V3 Chat (Recommended)", provider: "DeepSeek", isRecommended: true),
-                DiscoveredModel(modelId: "deepseek-reasoner", displayName: "DeepSeek-R1 Reasoner", provider: "DeepSeek")
-            ]
-        case "mistral":
-            return [
-                DiscoveredModel(modelId: "mistral-large-latest", displayName: "Mistral Large (Recommended)", provider: "Mistral AI", isRecommended: true),
-                DiscoveredModel(modelId: "codestral-latest", displayName: "Codestral (Code Specialist)", provider: "Mistral AI")
-            ]
-        case "anthropic":
-            return [
-                DiscoveredModel(modelId: "claude-3-5-sonnet-20241022", displayName: "Claude 3.5 Sonnet (Recommended)", provider: "Anthropic Claude", isRecommended: true),
-                DiscoveredModel(modelId: "claude-3-5-haiku-20241022", displayName: "Claude 3.5 Haiku (Fast)", provider: "Anthropic Claude")
-            ]
-        default:
-            return [
-                DiscoveredModel(modelId: "llama3.2", displayName: "llama3.2 (Local)", provider: "Ollama (Local)"),
-                DiscoveredModel(modelId: "mistral", displayName: "mistral (Local)", provider: "Ollama (Local)")
-            ]
+        guard (200...299).contains(http.statusCode) else {
+            let errString = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+            throw ModelDiscoveryError.invalidResponse(status: http.statusCode, message: errString)
+        }
+
+        struct OllamaListResponse: Codable {
+            struct OllamaModelItem: Codable {
+                let name: String
+            }
+            let models: [OllamaModelItem]?
+        }
+
+        let decoded: OllamaListResponse
+        do {
+            decoded = try JSONDecoder().decode(OllamaListResponse.self, from: data)
+        } catch {
+            throw ModelDiscoveryError.invalidResponse(status: http.statusCode, message: "Failed to parse Ollama model response.")
+        }
+
+        guard let raw = decoded.models, !raw.isEmpty else {
+            return []
+        }
+
+        return raw.map {
+            DiscoveredModel(
+                modelId: $0.name,
+                displayName: $0.name,
+                provider: "Ollama (Local)"
+            )
         }
     }
 }

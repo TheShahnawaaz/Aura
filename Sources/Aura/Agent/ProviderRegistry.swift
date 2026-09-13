@@ -17,7 +17,7 @@ public struct ProviderConfig: Identifiable, Hashable, Sendable {
         displayName: String,
         defaultBaseURL: String,
         envVarNames: [String],
-        defaultModel: String,
+        defaultModel: String = "",
         apiKeyPlaceholder: String = "sk-...",
         requiresApiKey: Bool = true,
         helpURL: String? = nil
@@ -44,7 +44,7 @@ public final class ProviderRegistry: Sendable {
             displayName: "Google Gemini",
             defaultBaseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
             envVarNames: ["GEMINI_API_KEY", "GOOGLE_API_KEY", "LLM_API_KEY"],
-            defaultModel: "gemini-2.5-flash",
+            defaultModel: "",
             apiKeyPlaceholder: "AIzaSy...",
             requiresApiKey: true,
             helpURL: "https://aistudio.google.com/app/apikey"
@@ -54,7 +54,7 @@ public final class ProviderRegistry: Sendable {
             displayName: "OpenAI",
             defaultBaseURL: "https://api.openai.com/v1",
             envVarNames: ["OPENAI_API_KEY"],
-            defaultModel: "gpt-4o-mini",
+            defaultModel: "",
             apiKeyPlaceholder: "sk-proj-...",
             requiresApiKey: true,
             helpURL: "https://platform.openai.com/api-keys"
@@ -64,7 +64,7 @@ public final class ProviderRegistry: Sendable {
             displayName: "Anthropic Claude",
             defaultBaseURL: "https://api.anthropic.com/v1",
             envVarNames: ["ANTHROPIC_API_KEY"],
-            defaultModel: "claude-3-5-sonnet-20241022",
+            defaultModel: "",
             apiKeyPlaceholder: "sk-ant-...",
             requiresApiKey: true,
             helpURL: "https://console.anthropic.com/settings/keys"
@@ -74,7 +74,7 @@ public final class ProviderRegistry: Sendable {
             displayName: "Groq (Ultra-Fast)",
             defaultBaseURL: "https://api.groq.com/openai/v1",
             envVarNames: ["GROQ_API_KEY"],
-            defaultModel: "llama-3.3-70b-versatile",
+            defaultModel: "",
             apiKeyPlaceholder: "gsk_...",
             requiresApiKey: true,
             helpURL: "https://console.groq.com/keys"
@@ -84,7 +84,7 @@ public final class ProviderRegistry: Sendable {
             displayName: "DeepSeek",
             defaultBaseURL: "https://api.deepseek.com/v1",
             envVarNames: ["DEEPSEEK_API_KEY"],
-            defaultModel: "deepseek-chat",
+            defaultModel: "",
             apiKeyPlaceholder: "sk-...",
             requiresApiKey: true,
             helpURL: "https://platform.deepseek.com/api_keys"
@@ -94,7 +94,7 @@ public final class ProviderRegistry: Sendable {
             displayName: "Mistral AI",
             defaultBaseURL: "https://api.mistral.ai/v1",
             envVarNames: ["MISTRAL_API_KEY"],
-            defaultModel: "mistral-large-latest",
+            defaultModel: "",
             apiKeyPlaceholder: "...",
             requiresApiKey: true,
             helpURL: "https://console.mistral.ai/api-keys"
@@ -104,18 +104,18 @@ public final class ProviderRegistry: Sendable {
             displayName: "Ollama (Local)",
             defaultBaseURL: "http://localhost:11434/v1",
             envVarNames: ["OLLAMA_HOST"],
-            defaultModel: "llama3.2",
+            defaultModel: "",
             apiKeyPlaceholder: "Not required (Local)",
             requiresApiKey: false,
             helpURL: "https://ollama.com"
         ),
         ProviderConfig(
             providerId: "custom",
-            displayName: "Custom / Proxy",
+            displayName: "Custom / OpenAI-Compatible",
             defaultBaseURL: "http://localhost:8000/v1",
-            envVarNames: ["AURA_BASE_URL", "OPENAI_BASE_URL", "LLM_BASE_URL"],
-            defaultModel: "gpt-4o",
-            apiKeyPlaceholder: "Optional",
+            envVarNames: ["AURA_BASE_URL", "OPENAI_BASE_URL", "LLM_BASE_URL", "AURA_API_KEY"],
+            defaultModel: "",
+            apiKeyPlaceholder: "Optional for local endpoints (e.g. sk-...)",
             requiresApiKey: false,
             helpURL: nil
         )
@@ -155,6 +155,8 @@ public final class ProviderRegistry: Sendable {
         case "groq": return "groqApiKey"
         case "deepseek": return "deepseekApiKey"
         case "mistral": return "mistralApiKey"
+        case "custom": return "customApiKey"
+        case "ollama": return "ollamaApiKey"
         default: return "\(providerId)ApiKey"
         }
     }

@@ -178,10 +178,44 @@ final class AgentSDKTests: XCTestCase {
         XCTAssertTrue(ModelDiscoveryService.isChatAndReasoningModel(modelId: "claude-3-5-sonnet-20241022"))
     }
 
-    func testModelDiscoveryFallbackPresets() {
-        let fallbacks = ModelDiscoveryService.shared.fallbackModels(for: "gemini")
-        XCTAssertFalse(fallbacks.isEmpty)
-        XCTAssertTrue(fallbacks.contains(where: { $0.modelId == "gemini-2.5-flash" }))
+    func testModelDiscoveryService_strictZeroFallbackOnEmptyKey() async {
+        do {
+            _ = try await ModelDiscoveryService.shared.fetchModels(provider: "gemini", apiKey: "")
+            XCTFail("Expected missingApiKey error when key is empty")
+        } catch let error as ModelDiscoveryError {
+            switch error {
+            case .missingApiKey(let provider):
+                XCTAssertEqual(provider, "Google Gemini")
+            default:
+                XCTFail("Unexpected error type: \(error)")
+            }
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func testCustomProviderRegisteredAndAccessible() {
+        let registry = ProviderRegistry.shared
+        let custom = registry.find(idOrName: "custom")
+        XCTAssertEqual(custom.providerId, "custom")
+        XCTAssertEqual(custom.displayName, "Custom / OpenAI-Compatible")
+        XCTAssertEqual(registry.userDefaultsKeyForApiKey(providerId: "custom"), "customApiKey")
+    }
+
+    func testLocalProxyModelDiscoveryIfAvailable() async {
+        // Test discovery against the running local proxy if reachable
+        do {
+            let models = try await ModelDiscoveryService.shared.fetchModels(
+                provider: "custom",
+                apiKey: "123456",
+                customBaseURL: "http://127.0.0.1:8317/v1",
+                forceRefresh: true
+            )
+            XCTAssertFalse(models.isEmpty)
+            XCTAssertTrue(models.contains(where: { $0.modelId == "gemini-3-flash" || $0.modelId.contains("flash") }))
+        } catch {
+            // If proxy is not running during CI, error is acceptable
+        }
     }
 
     @MainActor

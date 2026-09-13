@@ -19,17 +19,16 @@ public final class LLMService: @unchecked Sendable {
     }
 
     public var activeProviderName: String {
-        let url = resolveBaseURL()
-        if url.contains("googleapis.com") {
-            return "Google Gemini"
-        } else if url.contains("openai.com") {
-            return "OpenAI"
-        } else if url.contains("anthropic.com") {
-            return "Anthropic"
-        } else if url.contains("localhost") || url.contains("127.0.0.1") {
-            return "Local / Ollama"
+        let providerName = UserDefaults.standard.string(forKey: "selectedProvider") ?? activeProviderDefault()
+        let config = ProviderRegistry.shared.find(idOrName: providerName)
+        if config.providerId == "custom" {
+            let url = resolveBaseURL()
+            if url.contains("localhost") || url.contains("127.0.0.1") {
+                return "Local Endpoint"
+            }
+            return "Custom OpenAI"
         }
-        return "Custom OpenAI-Compatible"
+        return config.displayName
     }
 
     public var credentialSource: String {
@@ -49,7 +48,7 @@ public final class LLMService: @unchecked Sendable {
         }
 
         if !config.requiresApiKey {
-            return "Local (No Key Required)"
+            return "No Key Required"
         }
 
         return "Not Configured"
@@ -67,6 +66,9 @@ public final class LLMService: @unchecked Sendable {
 
         let baseURL = resolveBaseURL()
         let model = resolveModel()
+        guard !model.isEmpty else {
+            return (false, 0, "", "No model selected. Please fetch models first.")
+        }
         let endpoint = baseURL.hasSuffix("/") ? "\(baseURL)chat/completions" : "\(baseURL)/chat/completions"
 
         guard let url = URL(string: endpoint) else {
@@ -76,7 +78,9 @@ public final class LLMService: @unchecked Sendable {
         let startTime = CFAbsoluteTimeGetCurrent()
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if apiKey != "local-no-key" {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
@@ -143,7 +147,9 @@ public final class LLMService: @unchecked Sendable {
 
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            if apiKey != "local-no-key" {
+                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            }
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
             let temp = UserDefaults.standard.object(forKey: "llmTemperature") != nil ? UserDefaults.standard.double(forKey: "llmTemperature") : 0.2
@@ -200,6 +206,9 @@ public final class LLMService: @unchecked Sendable {
 
         let baseURL = resolveBaseURL()
         let model = resolveModel()
+        guard !model.isEmpty else {
+            throw NSError(domain: "AuraLLM", code: 400, userInfo: [NSLocalizedDescriptionKey: "No model selected. Please select a model in Aura Settings."])
+        }
         let endpoint = baseURL.hasSuffix("/") ? "\(baseURL)chat/completions" : "\(baseURL)/chat/completions"
 
         guard let url = URL(string: endpoint) else {
@@ -208,7 +217,9 @@ public final class LLMService: @unchecked Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        if apiKey != "local-no-key" {
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let temp = UserDefaults.standard.object(forKey: "llmTemperature") != nil ? UserDefaults.standard.double(forKey: "llmTemperature") : 0.2
@@ -307,21 +318,21 @@ public final class LLMService: @unchecked Sendable {
         let storageKey = ProviderRegistry.shared.userDefaultsKeyForApiKey(providerId: config.providerId)
 
         // Priority 1: User explicitly configured key for this provider
-        if let key = UserDefaults.standard.string(forKey: storageKey), !key.isEmpty {
-            return key
+        if let key = UserDefaults.standard.string(forKey: storageKey), !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return key.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         // Priority 2: Provider specific environment variables ONLY
         let env = ProcessInfo.processInfo.environment
         for varName in config.envVarNames {
-            if let key = env[varName], !key.isEmpty {
-                return key
+            if let key = env[varName], !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return key.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
 
-        // Providers that don't need a key (e.g. local Ollama)
+        // Providers that don't strictly require an API key (e.g. unauthenticated local engines)
         if !config.requiresApiKey {
-            return "ollama-local"
+            return "local-no-key"
         }
 
         return nil
@@ -331,28 +342,29 @@ public final class LLMService: @unchecked Sendable {
         let providerName = UserDefaults.standard.string(forKey: "selectedProvider") ?? activeProviderDefault()
         let config = ProviderRegistry.shared.find(idOrName: providerName)
 
-        if let custom = UserDefaults.standard.string(forKey: "customBaseUrl"), !custom.isEmpty {
-            return custom.hasSuffix("/") ? String(custom.dropLast()) : custom
+        if config.providerId == "custom" || config.providerId == "ollama" {
+            if let custom = UserDefaults.standard.string(forKey: "customBaseUrl"), !custom.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let trimmed = custom.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+            }
         }
 
         let env = ProcessInfo.processInfo.environment
         if let base = env["OPENAI_BASE_URL"] ?? env["LLM_BASE_URL"] ?? env["AURA_BASE_URL"], !base.isEmpty {
-            return base.hasSuffix("/") ? String(base.dropLast()) : base
+            let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
         }
 
         return config.defaultBaseURL
     }
 
     public func resolveModel() -> String {
+        if let saved = UserDefaults.standard.string(forKey: "selectedModel"), !saved.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return saved.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
         let providerName = UserDefaults.standard.string(forKey: "selectedProvider") ?? activeProviderDefault()
         let config = ProviderRegistry.shared.find(idOrName: providerName)
-
-        if let saved = UserDefaults.standard.string(forKey: "selectedModel"), !saved.isEmpty {
-            // Guard: Verify that the saved model is actually compatible with this provider
-            if isModelCompatibleWithProvider(model: saved, providerId: config.providerId) {
-                return saved
-            }
-        }
 
         let env = ProcessInfo.processInfo.environment
         if config.providerId == "gemini", let model = env["GEMINI_MODEL"] ?? env["LLM_MODEL"], !model.isEmpty {
@@ -369,23 +381,7 @@ public final class LLMService: @unchecked Sendable {
     }
 
     public func isModelCompatibleWithProvider(model: String, providerId: String) -> Bool {
-        let lower = model.lowercased()
-        switch providerId {
-        case "gemini":
-            return lower.starts(with: "gemini")
-        case "openai":
-            return lower.starts(with: "gpt-") || lower.starts(with: "o1") || lower.starts(with: "o3") || lower.starts(with: "chatgpt")
-        case "anthropic":
-            return lower.starts(with: "claude")
-        case "groq":
-            return lower.contains("llama") || lower.contains("mixtral") || lower.contains("qwen") || lower.contains("deepseek") || lower.contains("gemma")
-        case "deepseek":
-            return lower.contains("deepseek")
-        case "mistral":
-            return lower.contains("mistral") || lower.contains("codestral") || lower.contains("ministral")
-        default:
-            return true
-        }
+        return !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Instant zero-latency responses for common queries.
