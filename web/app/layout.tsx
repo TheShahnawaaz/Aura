@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://aura.mac"),
   title: "Aura — Autonomous Voice & Desktop AI Assistant for macOS",
   description:
-    "Aura is a native, voice-enabled desktop AI assistant for macOS that lives in your MacBook notch, responds to voice in real time, and executes real system workflows.",
+    "Aura is an autonomous, voice-first desktop AI assistant engineered for macOS Sequoia and Apple Silicon. Living in your MacBook camera notch, it executes native workflows, automates system calls, ducks audio playback, and connects to Model Context Protocol (MCP) servers.",
   icons: {
     icon: "/icon.png",
     apple: "/icon.png",
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Aura — Autonomous Voice & Desktop AI Assistant for macOS",
     description:
-      "Intelligence anchored at the notch. Executes terminal commands, controls media, queries Notion & Gmail, and connects to external MCP tools.",
+      "Hardware intelligence anchored at the MacBook notch. Executes AppleScript and terminal commands, enforces destructive shell guardrails, and integrates MCP tools.",
     url: "https://aura.mac",
     siteName: "Aura",
     images: [
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
         url: "/icon.png",
         width: 1024,
         height: 1024,
-        alt: "Aura Liquid Glass App Icon",
+        alt: "Aura App Icon",
       },
     ],
     locale: "en_US",
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Aura — Autonomous Voice & Desktop AI Assistant for macOS",
     description:
-      "Aura lives in your MacBook camera notch, understands voice with real-time acoustic shockwaves, and executes autonomous desktop tasks.",
+      "Aura lives in your MacBook camera notch, responds to speech with real-time acoustic shockwaves, and executes autonomous desktop tasks.",
     images: ["/icon.png"],
   },
 };
@@ -45,7 +45,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark scroll-smooth">
-      <body className="bg-background text-slate-100 antialiased min-h-screen selection:bg-cyan-500/30 selection:text-cyan-200">
+      <body className="bg-background text-slate-200 antialiased min-h-screen selection:bg-iris-500/30 selection:text-iris-100 font-sans">
         <SmoothScrollProvider>
           {children}
         </SmoothScrollProvider>

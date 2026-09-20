@@ -10,29 +10,45 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#07080b",
-        surface: {
-          50: "#181b24",
-          100: "#13151d",
-          200: "#0e1017",
-          300: "#0a0b10",
+        background: "#050608",
+        obsidian: {
+          DEFAULT: "#050608",
+          950: "#050608",
+          900: "#090B10",
+          850: "#0D1017",
+          800: "#121620",
+          750: "#181D2A",
+          700: "#22293A",
+          600: "#353F57",
         },
-        aurora: {
-          cyan: "#00E5FF",
-          blue: "#38BDF8",
-          sapphire: "#2563EB",
-          purple: "#A855F7",
-          coral: "#FB7185",
+        iris: {
+          DEFAULT: "#6366F1",
+          300: "#A5B4FC",
+          400: "#818CF8",
+          500: "#6366F1",
+          600: "#4F46E5",
+          700: "#4338CA",
+          glow: "rgba(99, 102, 241, 0.15)",
+        },
+        telemetry: {
           emerald: "#10B981",
-          teal: "#14B8A6",
+          amber: "#F59E0B",
+          rose: "#F43F5E",
+          cyan: "#06B6D4",
         },
       },
       fontFamily: {
-        sans: [
+        display: [
+          "SF Pro Display",
           "-apple-system",
           "BlinkMacSystemFont",
-          "SF Pro Display",
-          "Inter",
+          "system-ui",
+          "sans-serif",
+        ],
+        sans: [
+          "SF Pro Text",
+          "-apple-system",
+          "BlinkMacSystemFont",
           "system-ui",
           "sans-serif",
         ],
@@ -45,83 +61,37 @@ const config: Config = {
           "monospace",
         ],
       },
-      animation: {
-        "aurora-pulse": "auroraPulse 8s ease-in-out infinite",
-        "orbit-spin": "orbitSpin 20s linear infinite",
-        "float-gentle": "floatGentle 6s ease-in-out infinite",
-        "shimmer": "shimmer 2.5s linear infinite",
-        "glow-pulse": "glowPulse 3s ease-in-out infinite",
-        "gradient-shift": "gradientShift 8s ease-in-out infinite",
-        "float-particle": "floatParticle 6s ease-in-out infinite",
-        "typing-cursor": "typingCursor 1s step-end infinite",
-        "progress-sweep": "progressSweep 4s linear infinite",
-        "fade-in-up": "fadeInUp 0.6s ease-out forwards",
-        "scale-in": "scaleIn 0.5s ease-out forwards",
-        "slide-in-right": "slideInRight 0.5s ease-out forwards",
-        "breathe": "breathe 4s ease-in-out infinite",
-      },
-      keyframes: {
-        auroraPulse: {
-          "0%, 100%": { opacity: "0.4", transform: "scale(1)" },
-          "50%": { opacity: "0.75", transform: "scale(1.08)" },
-        },
-        orbitSpin: {
-          "0%": { transform: "rotate(0deg)" },
-          "100%": { transform: "rotate(360deg)" },
-        },
-        floatGentle: {
-          "0%, 100%": { transform: "translateY(0px)" },
-          "50%": { transform: "translateY(-8px)" },
-        },
-        shimmer: {
-          "0%": { backgroundPosition: "-200% 0" },
-          "100%": { backgroundPosition: "200% 0" },
-        },
-        glowPulse: {
-          "0%, 100%": { opacity: "0.4", boxShadow: "0 0 20px rgba(0, 229, 255, 0.1)" },
-          "50%": { opacity: "0.8", boxShadow: "0 0 40px rgba(0, 229, 255, 0.3)" },
-        },
-        gradientShift: {
-          "0%, 100%": { backgroundPosition: "0% 50%" },
-          "50%": { backgroundPosition: "100% 50%" },
-        },
-        floatParticle: {
-          "0%, 100%": { transform: "translateY(0) translateX(0)", opacity: "0" },
-          "10%": { opacity: "1" },
-          "90%": { opacity: "1" },
-          "50%": { transform: "translateY(-100px) translateX(20px)" },
-        },
-        typingCursor: {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0" },
-        },
-        progressSweep: {
-          "0%": { transform: "translateX(-100%)" },
-          "100%": { transform: "translateX(100%)" },
-        },
-        fadeInUp: {
-          "0%": { opacity: "0", transform: "translateY(30px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        scaleIn: {
-          "0%": { opacity: "0", transform: "scale(0.9)" },
-          "100%": { opacity: "1", transform: "scale(1)" },
-        },
-        slideInRight: {
-          "0%": { opacity: "0", transform: "translateX(-30px)" },
-          "100%": { opacity: "1", transform: "translateX(0)" },
-        },
-        breathe: {
-          "0%, 100%": { transform: "scale(1)" },
-          "50%": { transform: "scale(1.005)" },
-        },
+      borderRadius: {
+        "bezel-outer": "28px",
+        "bezel-inner": "22px",
+        "card-outer": "22px",
+        "card-inner": "17px",
+        "notch": "16px",
       },
       boxShadow: {
-        glow: "0 0 50px -10px rgba(0, 229, 255, 0.25)",
-        "glow-purple": "0 0 50px -10px rgba(168, 85, 247, 0.25)",
-        "glow-coral": "0 0 50px -10px rgba(251, 113, 133, 0.25)",
-        squircle: "0 12px 36px -8px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.12)",
-        "glow-lg": "0 0 80px -15px rgba(0, 229, 255, 0.4)",
+        "hairline": "inset 0 1px 0 0 rgba(255, 255, 255, 0.08)",
+        "hairline-subtle": "inset 0 1px 0 0 rgba(255, 255, 255, 0.04)",
+        "iris-glow": "0 0 32px -8px rgba(99, 102, 241, 0.25)",
+        "notch-elevation": "0 20px 48px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.06)",
+        "bezel-elevation": "0 24px 64px -16px rgba(0, 0, 0, 0.90), 0 0 0 1px rgba(255, 255, 255, 0.05)",
+      },
+      transitionTimingFunction: {
+        "apple": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "haptic": "cubic-bezier(0.32, 0.72, 0, 1)",
+      },
+      animation: {
+        "pulse-subtle": "pulseSubtle 3s ease-in-out infinite",
+        "shimmer-specular": "shimmerSpecular 6s cubic-bezier(0.16, 1, 0.3, 1) infinite",
+      },
+      keyframes: {
+        pulseSubtle: {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.85", transform: "scale(1.02)" },
+        },
+        shimmerSpecular: {
+          "0%": { transform: "translateX(-150%)" },
+          "100%": { transform: "translateX(250%)" },
+        },
       },
     },
   },

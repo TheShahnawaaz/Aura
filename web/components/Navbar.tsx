@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Download, Github, Menu, X } from "lucide-react";
 
 const navLinks = [
@@ -16,10 +16,15 @@ const navLinks = [
 export const Navbar: React.FC = () => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
-  const { scrollY } = useScroll();
-  const bgOpacity = useTransform(scrollY, [0, 100], [0, 0.85]);
-  const borderOpacity = useTransform(scrollY, [0, 100], [0, 0.08]);
-  const blur = useTransform(scrollY, [0, 100], [0, 20]);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -41,40 +46,39 @@ export const Navbar: React.FC = () => {
   return (
     <>
       <motion.header
-        initial={{ y: -80, opacity: 0 }}
+        initial={{ y: -60, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-        className="fixed top-0 inset-x-0 z-50 flex items-center justify-center p-4 select-none"
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="fixed top-0 inset-x-0 z-50 flex items-center justify-center pt-4 px-4 select-none pointer-events-none"
       >
-        <motion.nav
-          style={{
-            backgroundColor: useTransform(bgOpacity, (v) => `rgba(7, 8, 11, ${v})`),
-            borderColor: useTransform(borderOpacity, (v) => `rgba(255, 255, 255, ${v})`),
-            backdropFilter: useTransform(blur, (v) => `blur(${v}px)`),
-          }}
-          className="w-full max-w-5xl h-14 px-4 sm:px-6 rounded-2xl flex items-center justify-between shadow-2xl border border-transparent transition-shadow"
+        <nav
+          className={`pointer-events-auto w-full max-w-5xl h-13 px-4 sm:px-5 rounded-full flex items-center justify-between transition-all duration-300 ${
+            isScrolled
+              ? "bg-[#090B10]/85 backdrop-blur-xl border border-white/[0.09] shadow-[0_16px_40px_-12px_rgba(0,0,0,0.85)]"
+              : "bg-[#090B10]/60 backdrop-blur-md border border-white/[0.05]"
+          }`}
         >
           {/* Brand Logo & Name */}
           <motion.a
             href="#"
-            className="flex items-center gap-3 group"
-            whileHover={{ scale: 1.03 }}
+            className="flex items-center gap-2.5 group py-1.5"
+            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/15 shadow-md group-hover:shadow-glow transition-shadow duration-300">
+            <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-white/15 shadow-sm">
               <Image
                 src="/icon.png"
                 alt="Aura Icon"
-                width={32}
-                height={32}
+                width={28}
+                height={28}
                 className="object-cover"
                 priority
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold tracking-tight text-white text-base">Aura</span>
-              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-                Beta
+            <div className="flex items-center gap-2">
+              <span className="font-bold tracking-tight text-white text-sm">Aura</span>
+              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-iris-500/15 text-iris-300 border border-iris-500/25">
+                v0.1.0
               </span>
             </div>
           </motion.a>
@@ -82,91 +86,97 @@ export const Navbar: React.FC = () => {
           {/* Center Navigation Links */}
           <div className="hidden md:flex items-center gap-1 text-xs font-medium">
             {navLinks.map((link) => (
-              <motion.a
+              <a
                 key={link.href}
                 href={link.href}
-                className={`relative px-3.5 py-2 rounded-xl transition-colors ${
+                className={`relative px-3.5 py-1.5 rounded-full transition-colors ${
                   activeSection === link.href
                     ? "text-white"
                     : "text-slate-400 hover:text-white"
                 }`}
-                whileHover={{ y: -1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
               >
                 {activeSection === link.href && (
                   <motion.div
-                    layoutId="activeNavBg"
-                    className="absolute inset-0 rounded-xl bg-white/[0.08] border border-white/[0.06]"
-                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    layoutId="activeNavPill"
+                    className="absolute inset-0 rounded-full bg-white/[0.08] border border-white/[0.06]"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
                 <span className="relative z-10">{link.label}</span>
-              </motion.a>
+              </a>
             ))}
           </div>
 
           {/* Action CTAs */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2.5">
             <motion.a
               href="https://github.com/TheShahnawaaz/Aura"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 transition-all"
-              whileHover={{ scale: 1.03, y: -1 }}
+              className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 bg-white/[0.03] hover:bg-white/[0.07] transition-all"
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
               <Github className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Star on GitHub</span>
+              <span>GitHub</span>
             </motion.a>
 
             <motion.a
               href="#download"
-              className="relative flex items-center gap-1.5 text-xs font-semibold text-black bg-gradient-to-r from-cyan-300 via-sky-300 to-cyan-200 hover:brightness-110 px-4 py-2 rounded-xl shadow-lg shadow-cyan-500/20 transition-all overflow-hidden"
-              whileHover={{ scale: 1.05, y: -1 }}
-              whileTap={{ scale: 0.97 }}
+              className="group flex items-center gap-2 text-xs font-semibold text-black bg-white hover:bg-slate-100 pl-3.5 pr-1.5 py-1 rounded-full shadow-[0_4px_16px_-4px_rgba(255,255,255,0.3)] transition-all"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download .dmg</span>
-              {/* Shimmer sweep */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full animate-[shimmer_3s_ease-in-out_infinite]" />
+              <span>Download</span>
+              <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <Download className="w-3 h-3 text-black" />
+              </div>
             </motion.a>
           </div>
 
           {/* Mobile Menu Button */}
           <motion.button
-            className="md:hidden p-2 text-white/60 hover:text-white"
+            className="md:hidden p-1.5 text-white/70 hover:text-white"
             onClick={() => setIsMobileOpen(!isMobileOpen)}
-            whileTap={{ scale: 0.9 }}
+            whileTap={{ scale: 0.92 }}
+            aria-label="Toggle navigation menu"
           >
-            {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
+            {isMobileOpen ? <X size={18} /> : <Menu size={18} />}
           </motion.button>
-        </motion.nav>
+        </nav>
       </motion.header>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu Overlay */}
       <AnimatePresence>
         {isMobileOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -15 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed top-20 inset-x-4 z-50 p-4 rounded-2xl bg-background/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl"
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed top-20 inset-x-4 z-50 p-4 rounded-2xl bg-[#090B10]/95 backdrop-blur-2xl border border-white/[0.09] shadow-2xl md:hidden"
           >
             <div className="space-y-1">
-              {navLinks.map((link, i) => (
-                <motion.a
+              {navLinks.map((link) => (
+                <a
                   key={link.href}
                   href={link.href}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="block px-4 py-3 text-sm text-white/70 hover:text-white rounded-xl hover:bg-white/[0.04] transition-colors"
+                  className="block px-4 py-2.5 text-sm text-white/70 hover:text-white rounded-xl hover:bg-white/[0.05] transition-colors"
                   onClick={() => setIsMobileOpen(false)}
                 >
                   {link.label}
-                </motion.a>
+                </a>
               ))}
+              <div className="pt-3 mt-2 border-t border-white/[0.06] flex flex-col gap-2">
+                <a
+                  href="#download"
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white text-black font-semibold text-xs text-center"
+                  onClick={() => setIsMobileOpen(false)}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download for macOS</span>
+                </a>
+              </div>
             </div>
           </motion.div>
         )}

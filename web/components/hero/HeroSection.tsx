@@ -2,7 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { Apple, ArrowRight, Terminal, ArrowDown } from "lucide-react";
+import { Apple, ArrowRight, Terminal } from "lucide-react";
 import { NotchSimulator } from "./NotchSimulator";
 import { AuroraBackground } from "./AuroraBackground";
 
@@ -12,21 +12,19 @@ const containerVariants = {
     opacity: 1,
     transition: {
       staggerChildren: 0.12,
-      delayChildren: 0.3,
+      delayChildren: 0.2,
     },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 30, filter: "blur(10px)" },
+  hidden: { opacity: 0, y: 24 },
   visible: {
     opacity: 1,
     y: 0,
-    filter: "blur(0px)",
     transition: {
-      type: "spring",
-      stiffness: 100,
-      damping: 20,
+      duration: 0.7,
+      ease: [0.16, 1, 0.3, 1],
     },
   },
 };
@@ -35,85 +33,87 @@ export const HeroSection: React.FC = () => {
   return (
     <section
       id="notch"
-      className="relative pt-36 pb-24 px-4 flex flex-col items-center justify-center overflow-hidden w-full min-h-screen"
+      className="relative pt-32 sm:pt-40 pb-24 px-4 flex flex-col items-center justify-center overflow-hidden w-full min-h-screen"
     >
       {/* 3D WebGL Aurora Background */}
       <AuroraBackground />
 
-      {/* Precision Radial Lighting */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-6xl h-[650px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-purple-500/5 to-transparent pointer-events-none" />
+      {/* Specular Radial Ambient Depth */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[550px] bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.12),_rgba(15,17,23,0)_70%)] pointer-events-none" />
 
-      {/* Animated content */}
+      {/* Hero Content */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="relative z-10 flex flex-col items-center"
+        className="relative z-10 flex flex-col items-center text-center max-w-4xl mx-auto"
       >
-        {/* Hardware Architecture Pill */}
+        {/* Hardware Status Pill */}
         <motion.div
           variants={itemVariants}
-          className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#11131a]/80 border border-white/[0.08] text-xs font-medium text-slate-300 shadow-xl backdrop-blur-xl mb-7 hover:border-white/20 transition-colors"
+          className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#0D1017]/90 border border-white/[0.08] text-xs text-slate-300 shadow-hairline backdrop-blur-xl mb-8"
         >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
           </span>
-          <span className="text-white font-semibold">Aura 0.1.0 Public Beta</span>
-          <span className="text-slate-600">/</span>
-          <span className="text-slate-400">
-            Engineered for Apple Silicon & macOS Sequoia
+          <span className="text-white font-semibold">Aura v0.1.0</span>
+          <span className="text-slate-600">·</span>
+          <span className="text-slate-400 font-mono text-[11px]">
+            Native Swift · Apple Silicon & macOS Sequoia
           </span>
         </motion.div>
 
-        {/* Main Headline */}
+        {/* High-Impact Heading (No rainbow text-clipping) */}
         <motion.h1
           variants={itemVariants}
-          className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-[-0.035em] text-center max-w-4xl text-white leading-[1.08] mb-6"
+          className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-[-0.04em] text-white leading-[1.06] mb-6"
         >
-          The desktop intelligence <br className="hidden sm:inline" />
-          <span className="shimmer-text">
+          The desktop intelligence <br />
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400">
             anchored at your notch.
           </span>
         </motion.h1>
 
-        {/* Subtitle */}
+        {/* Technical Subtitle */}
         <motion.p
           variants={itemVariants}
-          className="text-base sm:text-lg md:text-xl text-slate-400 text-center max-w-2xl leading-relaxed mb-10 font-normal"
+          className="text-base sm:text-lg text-slate-400 max-w-2xl leading-relaxed mb-10 font-normal"
         >
-          Aura transforms the MacBook camera notch into an autonomous action
-          center. Activated by voice, powered by OpenAgentSDK, and built purely
-          in native Swift.
+          Aura transforms the MacBook camera bezel into a tactile, responsive action center.
+          Driven by voice with instant barge-in, backed by OpenAgentSDK, and running natively with zero electron bloat.
         </motion.p>
 
-        {/* CTA Row */}
+        {/* Action CTAs with Button-in-Button Architecture */}
         <motion.div
           variants={itemVariants}
           className="flex flex-wrap items-center justify-center gap-4 mb-20"
         >
+          {/* Primary Download Button */}
           <motion.a
             href="#download"
-            className="relative flex items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-white text-black font-semibold text-sm shadow-[0_10px_30px_-5px_rgba(255,255,255,0.3)] hover:bg-slate-100 transition-all overflow-hidden group"
-            whileHover={{ scale: 1.04, y: -2 }}
-            whileTap={{ scale: 0.97 }}
+            className="group relative flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-white text-black font-semibold text-sm shadow-[0_12px_32px_-8px_rgba(255,255,255,0.25)] hover:bg-slate-100 transition-all"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
             <Apple className="w-4 h-4 fill-current" />
             <span>Download for macOS</span>
-            <ArrowRight className="w-4 h-4 text-slate-500 group-hover:translate-x-1 transition-transform" />
-            {/* Button shine */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+            {/* Nested button-in-button circular icon wrapper */}
+            <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center group-hover:scale-105 group-hover:translate-x-0.5 transition-all">
+              <ArrowRight className="w-3.5 h-3.5 text-black" />
+            </div>
           </motion.a>
 
+          {/* Terminal Command Button */}
           <motion.a
             href="https://github.com/TheShahnawaaz/Aura"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-[#11131a] border border-white/[0.08] hover:border-white/20 text-slate-300 font-mono text-xs transition-all hover:bg-[#161822]"
-            whileHover={{ scale: 1.04, y: -2 }}
-            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-2 px-5 py-3 rounded-full bg-[#0D1017] border border-white/[0.08] hover:border-white/20 text-slate-300 font-mono text-xs transition-all hover:bg-[#121620] shadow-hairline"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
-            <Terminal className="w-3.5 h-3.5 text-cyan-400" />
+            <Terminal className="w-3.5 h-3.5 text-iris-400" />
             <span>brew install TheShahnawaaz/tap/aura</span>
           </motion.a>
         </motion.div>
@@ -121,38 +121,19 @@ export const HeroSection: React.FC = () => {
 
       {/* PHOTOREALISTIC MACBOOK PRO SIMULATOR */}
       <motion.div
-        initial={{ opacity: 0, y: 60, scale: 0.95 }}
+        initial={{ opacity: 0, y: 50, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{
-          duration: 1.0,
-          delay: 0.8,
-          ease: [0.22, 1, 0.36, 1],
+          duration: 0.9,
+          delay: 0.4,
+          ease: [0.16, 1, 0.3, 1],
         }}
-        className="relative z-10"
+        className="relative z-10 w-full"
       >
         <NotchSimulator />
       </motion.div>
 
-      {/* Scroll indicator */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 2, duration: 1 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10"
-      >
-        <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          className="flex flex-col items-center gap-2"
-        >
-          <span className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">
-            Scroll to explore
-          </span>
-          <ArrowDown size={14} className="text-slate-500" />
-        </motion.div>
-      </motion.div>
-
-      {/* Bottom fade */}
+      {/* Bottom Vignette */}
       <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-background via-background/80 to-transparent pointer-events-none z-20" />
     </section>
   );
