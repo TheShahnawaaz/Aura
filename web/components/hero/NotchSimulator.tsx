@@ -419,14 +419,7 @@ export const NotchSimulator: React.FC = () => {
               </div>
 
               {/* PROPORTIONALLY SCALED NOTCH MOUNT */}
-              <div
-                className="absolute top-0 left-1/2 -translate-x-1/2 z-40 pointer-events-auto"
-                style={{
-                  width: `${current.width * notchScale}px`,
-                  height: `${current.height * notchScale}px`,
-                  transition: "width 0.35s cubic-bezier(0.16, 1, 0.3, 1), height 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
-                }}
-              >
+              <div className="absolute top-0 left-1/2 w-0 flex justify-center pointer-events-none z-40">
                 <motion.div
                   animate={{
                     width: current.width,
@@ -440,7 +433,7 @@ export const NotchSimulator: React.FC = () => {
                   }}
                   onMouseEnter={() => setIsHovered(true)}
                   onMouseLeave={() => setIsHovered(false)}
-                  className="relative flex flex-col items-center"
+                  className="relative flex flex-col items-center pointer-events-auto shrink-0"
                   style={{
                     width: `${current.width}px`,
                     height: `${current.height}px`,
@@ -772,7 +765,7 @@ export const NotchSimulator: React.FC = () => {
       </div>
 
       {/* LOWER MACBOOK UNIBODY CHASSIS (ALUMINUM DECK & THUMB SCOOP) */}
-      <div className="relative w-[101.5%] -left-[0.75%] h-[14px] sm:h-[18px] bg-gradient-to-b from-[#282B34] via-[#1C1E25] to-[#121418] border-t border-white/[0.22] rounded-b-[10px] shadow-[0_20px_45px_-10px_rgba(0,0,0,0.95)] z-10 flex items-start justify-center">
+      <div className="relative w-[101.6%] self-center h-[14px] sm:h-[18px] bg-gradient-to-b from-[#282B34] via-[#1C1E25] to-[#121418] border-t border-white/[0.22] rounded-b-[10px] shadow-[0_20px_45px_-10px_rgba(0,0,0,0.95)] z-10 flex items-start justify-center">
         {/* Display Hinge Center Line */}
         <div className="absolute -top-[3px] inset-x-8 h-[3px] bg-[#0A0B0E] rounded-t-sm" />
         {/* Iconic Centered Lid Opening Thumb Scoop */}
