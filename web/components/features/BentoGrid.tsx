@@ -1,14 +1,48 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import { Sparkles, Terminal, ShieldCheck, KeyRound, Cpu, Sliders, Music, Zap, Layers, Lock, ShieldAlert } from "lucide-react";
 import { LivingOrbCanvas } from "../hero/LivingOrbCanvas";
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 40, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 20,
+    },
+  },
+};
+
 export const BentoGrid: React.FC = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
   return (
-    <section id="features" className="py-28 px-4 max-w-6xl mx-auto w-full">
+    <section id="features" className="py-28 px-4 max-w-6xl mx-auto w-full" ref={ref}>
       {/* Refined Section Header */}
-      <div className="max-w-2xl mb-16">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={isInView ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="max-w-2xl mb-16"
+      >
         <span className="text-xs font-mono uppercase tracking-widest text-cyan-400 font-semibold block mb-2">
           Engineering & Craft
         </span>
@@ -16,12 +50,24 @@ export const BentoGrid: React.FC = () => {
           Built for the Mac. <br />
           <span className="text-slate-500">Not ported from the web.</span>
         </h2>
-      </div>
+      </motion.div>
 
       {/* Modern High-End Bento Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate={isInView ? "visible" : "hidden"}
+        className="grid grid-cols-1 md:grid-cols-3 gap-5"
+      >
         {/* CARD 1: Double Width - Hardware Notch HUD */}
-        <div className="md:col-span-2 rounded-[24px] p-8 sm:p-10 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.14] transition-all flex flex-col justify-between relative overflow-hidden group">
+        <motion.div
+          variants={cardVariants}
+          whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          className="md:col-span-2 rounded-[24px] p-8 sm:p-10 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.18] transition-all flex flex-col justify-between relative overflow-hidden group card-shine"
+        >
+          {/* Hover glow */}
+          <div className="absolute -top-20 -right-20 w-[300px] h-[300px] rounded-full bg-cyan-500/[0.04] blur-[80px] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+          
           <div className="space-y-3 max-w-lg z-10">
             <span className="text-[11px] font-mono uppercase text-slate-500 font-semibold">
               Interface Innovation
@@ -34,10 +80,13 @@ export const BentoGrid: React.FC = () => {
             </p>
           </div>
 
-          {/* Micro Visual Architecture of the Notch */}
           <div className="mt-10 pt-6 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-4 z-10">
             <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-cyan-400" />
+              <motion.span
+                className="w-2 h-2 rounded-full bg-cyan-400"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              />
               <span className="text-xs font-mono text-slate-300">
                 Pixel-perfect flush (<code className="text-cyan-300">screenFrame.maxY - panelHeight</code>)
               </span>
@@ -46,10 +95,14 @@ export const BentoGrid: React.FC = () => {
               SwiftUI + AppKit NSPanel
             </span>
           </div>
-        </div>
+        </motion.div>
 
-        {/* CARD 2: 4 Living Aurora Orb Archetypes */}
-        <div className="rounded-[24px] p-8 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.14] transition-all flex flex-col justify-between group">
+        {/* CARD 2: Living Aurora Orb Archetypes */}
+        <motion.div
+          variants={cardVariants}
+          whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          className="rounded-[24px] p-8 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.18] transition-all flex flex-col justify-between group card-shine"
+        >
           <div className="space-y-3">
             <span className="text-[11px] font-mono uppercase text-slate-500 font-semibold">
               Tactile Visual Feedback
@@ -63,27 +116,33 @@ export const BentoGrid: React.FC = () => {
           </div>
 
           <div className="mt-8 flex items-center justify-between p-3.5 rounded-2xl bg-black/40 border border-white/[0.05]">
-            <div className="flex flex-col items-center gap-1.5">
-              <LivingOrbCanvas state="idle" size={28} />
-              <span className="text-[9px] font-mono text-slate-500">Idle</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5">
-              <LivingOrbCanvas state="listening" size={28} />
-              <span className="text-[9px] font-mono text-cyan-400">Listen</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5">
-              <LivingOrbCanvas state="processing" size={28} />
-              <span className="text-[9px] font-mono text-purple-400">Think</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5">
-              <LivingOrbCanvas state="speaking" size={28} />
-              <span className="text-[9px] font-mono text-rose-400">Speak</span>
-            </div>
+            {(["idle", "listening", "processing", "speaking"] as const).map((state, i) => (
+              <motion.div
+                key={state}
+                className="flex flex-col items-center gap-1.5"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={isInView ? { opacity: 1, scale: 1 } : {}}
+                transition={{ delay: 0.4 + i * 0.15, type: "spring" }}
+              >
+                <LivingOrbCanvas state={state} size={28} />
+                <span className={`text-[9px] font-mono ${
+                  state === "idle" ? "text-slate-500" :
+                  state === "listening" ? "text-cyan-400" :
+                  state === "processing" ? "text-purple-400" : "text-rose-400"
+                }`}>
+                  {state === "idle" ? "Idle" : state === "listening" ? "Listen" : state === "processing" ? "Think" : "Speak"}
+                </span>
+              </motion.div>
+            ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* CARD 3: Autonomous Desktop Execution */}
-        <div className="rounded-[24px] p-8 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.14] transition-all flex flex-col justify-between group">
+        <motion.div
+          variants={cardVariants}
+          whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          className="rounded-[24px] p-8 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.18] transition-all flex flex-col justify-between group card-shine"
+        >
           <div className="space-y-3">
             <span className="text-[11px] font-mono uppercase text-slate-500 font-semibold">
               Autonomous Runtime
@@ -97,23 +156,29 @@ export const BentoGrid: React.FC = () => {
           </div>
 
           <div className="mt-6 space-y-1.5 font-mono text-[11px]">
-            <div className="px-3 py-1.5 rounded-lg bg-black/40 border border-white/[0.05] text-slate-300 flex items-center justify-between">
-              <span>open_application</span>
-              <span className="text-cyan-400">AppKit</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-lg bg-black/40 border border-white/[0.05] text-slate-300 flex items-center justify-between">
-              <span>adjust_volume</span>
-              <span className="text-cyan-400">CoreAudio</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-lg bg-black/40 border border-white/[0.05] text-slate-300 flex items-center justify-between">
-              <span>take_screenshot</span>
-              <span className="text-cyan-400">CoreGraphics</span>
-            </div>
+            {["open_application", "adjust_volume", "take_screenshot"].map((tool, i) => (
+              <motion.div
+                key={tool}
+                initial={{ opacity: 0, x: -20 }}
+                animate={isInView ? { opacity: 1, x: 0 } : {}}
+                transition={{ delay: 0.5 + i * 0.1, type: "spring" }}
+                className="px-3 py-1.5 rounded-lg bg-black/40 border border-white/[0.05] text-slate-300 flex items-center justify-between hover:border-cyan-500/20 hover:bg-cyan-950/10 transition-colors"
+              >
+                <span>{tool}</span>
+                <span className="text-cyan-400">
+                  {tool === "open_application" ? "AppKit" : tool === "adjust_volume" ? "CoreAudio" : "CoreGraphics"}
+                </span>
+              </motion.div>
+            ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* CARD 4: Proactive Safety Guardrails */}
-        <div className="rounded-[24px] p-8 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.14] transition-all flex flex-col justify-between group">
+        <motion.div
+          variants={cardVariants}
+          whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          className="rounded-[24px] p-8 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.18] transition-all flex flex-col justify-between group card-shine"
+        >
           <div className="space-y-3">
             <span className="text-[11px] font-mono uppercase text-slate-500 font-semibold">
               Security by Default
@@ -126,14 +191,21 @@ export const BentoGrid: React.FC = () => {
             </p>
           </div>
 
-          <div className="mt-6 p-3 rounded-xl bg-rose-950/20 border border-rose-500/20 flex items-center gap-2.5 text-xs text-rose-300 font-mono">
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="mt-6 p-3 rounded-xl bg-rose-950/20 border border-rose-500/20 flex items-center gap-2.5 text-xs text-rose-300 font-mono"
+          >
             <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
             <span>Destructive scripts require manual confirmation</span>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* CARD 5: Privacy-First macOS Keychain */}
-        <div className="rounded-[24px] p-8 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.14] transition-all flex flex-col justify-between group">
+        <motion.div
+          variants={cardVariants}
+          whileHover={{ y: -4, transition: { type: "spring", stiffness: 300, damping: 20 } }}
+          className="rounded-[24px] p-8 bg-[#0c0e14] border border-white/[0.07] hover:border-white/[0.18] transition-all flex flex-col justify-between group card-shine"
+        >
           <div className="space-y-3">
             <span className="text-[11px] font-mono uppercase text-slate-500 font-semibold">
               Zero Telemetry
@@ -147,11 +219,16 @@ export const BentoGrid: React.FC = () => {
           </div>
 
           <div className="mt-6 flex items-center gap-2 text-xs font-mono text-slate-400">
-            <Lock className="w-3.5 h-3.5 text-emerald-400" />
+            <motion.div
+              animate={{ rotate: [0, 5, -5, 0] }}
+              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+            >
+              <Lock className="w-3.5 h-3.5 text-emerald-400" />
+            </motion.div>
             <span>Encrypted locally in Keychain Vault</span>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </section>
   );
 };
