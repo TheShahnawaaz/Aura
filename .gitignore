@@ -48,3 +48,6 @@ web/.vercel/
 
 # Agent Skills Lock
 skills-lock.json
+
+# Video & Launch Render Outputs
+brag-output*/
