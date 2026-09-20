@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { AppleLogo } from "@/components/icons/AppleLogo";
+import { SiApple } from "@icons-pack/react-simple-icons";
 import { LivingOrbCanvas, AssistantOrbState } from "./LivingOrbCanvas";
 import {
   MessageSquare,
@@ -370,7 +370,7 @@ export const NotchSimulator: React.FC = () => {
               <div className="w-full h-[26px] px-3.5 flex items-center justify-between text-[10.5px] font-medium text-slate-200 z-20 backdrop-blur-md bg-black/25 border-b border-white/[0.06]">
                 {/* Left System Items */}
                 <div className="flex items-center gap-3">
-                  <AppleLogo className="w-3 h-3 fill-white shrink-0 -translate-y-[0.5px]" />
+                  <SiApple className="w-3 h-3 fill-white shrink-0 -translate-y-[0.5px]" />
                   <span className="font-semibold text-white">Finder</span>
                   <span className="hidden md:inline text-slate-300">File</span>
                   <span className="hidden md:inline text-slate-300">Edit</span>

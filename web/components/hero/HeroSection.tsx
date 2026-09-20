@@ -3,7 +3,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Terminal } from "lucide-react";
-import { AppleLogo } from "@/components/icons/AppleLogo";
+import { SiApple } from "@icons-pack/react-simple-icons";
 import { NotchSimulator } from "./NotchSimulator";
 import { AuroraBackground } from "./AuroraBackground";
 
@@ -97,7 +97,7 @@ export const HeroSection: React.FC = () => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <AppleLogo className="w-4 h-4 fill-current" />
+            <SiApple className="w-4 h-4 fill-current" />
             <span>Download for macOS</span>
             {/* Nested button-in-button circular icon wrapper */}
             <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center group-hover:scale-105 group-hover:translate-x-0.5 transition-all">

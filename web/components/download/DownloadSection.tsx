@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import Image from "next/image";
 import { motion, useInView } from "framer-motion";
 import { Copy, Check, Shield, Cpu, ArrowRight } from "lucide-react";
-import { AppleLogo } from "@/components/icons/AppleLogo";
+import { SiApple } from "@icons-pack/react-simple-icons";
 
 export const DownloadSection: React.FC = () => {
   const [copied, setCopied] = useState(false);
@@ -55,7 +55,7 @@ export const DownloadSection: React.FC = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              <AppleLogo className="w-4 h-4 fill-current" />
+              <SiApple className="w-4 h-4 fill-current" />
               <span>Download for Mac (.dmg)</span>
               <div className="w-8 h-8 rounded-full bg-black/10 flex items-center justify-center group-hover:scale-105 group-hover:translate-x-0.5 transition-all">
                 <ArrowRight className="w-3.5 h-3.5 text-black" />
