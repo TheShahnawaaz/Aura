@@ -27,17 +27,23 @@ public struct ControlCenterGlassCard<Content: View>: View {
                         .strokeBorder(
                             isHovered
                                 ? LinearGradient(
-                                    colors: [Color.white.opacity(0.22), Color.white.opacity(0.06)],
+                                    colors: [Color.white.opacity(0.20), Color.white.opacity(0.06)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                                 : ControlCenterTokens.Gradients.specularBorder,
-                            lineWidth: 1
+                            lineWidth: ControlCenterTokens.Stroke.hairline
                         )
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: Color.black.opacity(0.25), radius: 8, x: 0, y: 3)
+            .shadow(
+                color: Color.black.opacity(isHovered ? 0.32 : 0.20),
+                radius: isHovered ? 10 : 6,
+                x: 0,
+                y: isHovered ? 3 : 2
+            )
+            .offset(y: isHovered ? -0.5 : 0)
             .onHover { hovering in
                 withAnimation(ControlCenterTokens.Motion.snappy) {
                     isHovered = hovering

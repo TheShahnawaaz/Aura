@@ -308,9 +308,9 @@ public struct ConnectorsSettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 12) {
-                customField("Server Name", placeholder: "e.g. my-local-db", text: $customName)
+                customField("Server Name", placeholder: "e.g. my-local-service", text: $customName)
                 customField("Executable Command", placeholder: "e.g. npx, python3, uvx, node", text: $customCommand)
-                customField("Arguments (space separated)", placeholder: "e.g. -y @modelcontextprotocol/server-sqlite --db-path /tmp/app.db", text: $customArgs)
+                customField("Arguments (space separated)", placeholder: "e.g. -y @modelcontextprotocol/server-github", text: $customArgs)
                 customField("Environment Variables (KEY=VALUE, comma separated)", placeholder: "e.g. API_KEY=abc123xyz, DEBUG=1", text: $customEnv)
             }
 
@@ -474,30 +474,6 @@ public struct ConnectorsSettingsView: View {
                 env: ["GITHUB_PERSONAL_ACCESS_TOKEN": cleanInput],
                 isEnabled: true
             )
-        case .notion:
-            server = MCPServerConfig(
-                name: "notion",
-                command: "npx",
-                args: ["-y", "@modelcontextprotocol/server-notion"],
-                env: ["NOTION_API_KEY": cleanInput],
-                isEnabled: true
-            )
-        case .gmail:
-            server = MCPServerConfig(
-                name: "gmail",
-                command: "uvx",
-                args: ["gmail-mcp", "--credentials", cleanInput],
-                env: [:],
-                isEnabled: true
-            )
-        case .sqlite:
-            server = MCPServerConfig(
-                name: "sqlite",
-                command: "npx",
-                args: ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", cleanInput],
-                env: [:],
-                isEnabled: true
-            )
         case .fetch:
             server = MCPServerConfig(
                 name: "fetch",
@@ -525,52 +501,37 @@ public struct ConnectorsSettingsView: View {
 
 // MARK: - Presets Definition
 enum QuickConnectorPreset: String, CaseIterable, Identifiable {
-    case gmail = "Gmail"
-    case notion = "Notion"
     case github = "GitHub"
     case fetch = "Web Fetch"
-    case sqlite = "SQLite"
 
     var id: String { rawValue }
     var title: String { rawValue }
 
     var serverName: String {
         switch self {
-        case .gmail: return "gmail"
-        case .notion: return "notion"
         case .github: return "github"
         case .fetch: return "fetch"
-        case .sqlite: return "sqlite"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .gmail: return "Read, search, and draft emails"
-        case .notion: return "Query workspace databases & docs"
         case .github: return "Inspect repos, pull requests, issues"
         case .fetch: return "Fetch & convert web pages to markdown"
-        case .sqlite: return "Query local SQLite database files"
         }
     }
 
     var iconName: String {
         switch self {
-        case .gmail: return "envelope.fill"
-        case .notion: return "doc.text.fill"
         case .github: return "chevron.left.forwardslash.chevron.right"
         case .fetch: return "globe"
-        case .sqlite: return "cylinder.split.1x2.fill"
         }
     }
 
     var color: Color {
         switch self {
-        case .gmail: return .red
-        case .notion: return .purple
         case .github: return .gray
         case .fetch: return .blue
-        case .sqlite: return .orange
         }
     }
 
@@ -580,39 +541,27 @@ enum QuickConnectorPreset: String, CaseIterable, Identifiable {
 
     var instructions: String {
         switch self {
-        case .gmail: return "Provide the path to your Google Cloud credentials.json file. Run 'uvx gmail-mcp' once in terminal to authorize."
-        case .notion: return "Enter your Notion Integration Token (secret_...) created in Notion Developers portal."
         case .github: return "Enter your GitHub Personal Access Token (classic or fine-grained with repo scope)."
-        case .sqlite: return "Enter the absolute file path to your local SQLite database file."
         case .fetch: return "Installs @modelcontextprotocol/server-fetch instantly."
         }
     }
 
     var inputLabel: String {
         switch self {
-        case .gmail: return "Path to credentials.json"
-        case .notion: return "Notion API Token"
         case .github: return "GitHub Access Token"
-        case .sqlite: return "Database File Path"
         case .fetch: return ""
         }
     }
 
     var inputPlaceholder: String {
         switch self {
-        case .gmail: return "/Users/you/credentials.json"
-        case .notion: return "secret_abc123..."
         case .github: return "ghp_..."
-        case .sqlite: return "/Users/you/Documents/app.db"
         case .fetch: return ""
         }
     }
 
     var defaultCommand: String {
-        switch self {
-        case .gmail: return "uvx"
-        default: return "npx"
-        }
+        "npx"
     }
 
     var defaultArgs: [String] {

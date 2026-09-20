@@ -9,18 +9,22 @@ public enum ControlCenterTokens {
         /// Primary deep space obsidian background
         public static let windowBackdrop = Color(red: 0.035, green: 0.038, blue: 0.046)
 
-        /// Sidebar background tone
-        public static let sidebarBackdrop = Color(red: 0.045, green: 0.048, blue: 0.058).opacity(0.88)
+        /// Sidebar background tone with Apple Vibrancy blend
+        public static let sidebarBackdrop = Color(red: 0.042, green: 0.045, blue: 0.054).opacity(0.92)
 
         /// Translucent elevated glass card fill
-        public static let glassSurface = Color(red: 0.10, green: 0.105, blue: 0.14).opacity(0.58)
+        public static let glassSurface = Color(red: 0.09, green: 0.095, blue: 0.125).opacity(0.62)
 
         /// Deep sunken background for code blocks, inputs, and terminals
-        public static let sunkenSurface = Color(red: 0.02, green: 0.025, blue: 0.035).opacity(0.75)
+        public static let sunkenSurface = Color(red: 0.018, green: 0.020, blue: 0.028).opacity(0.85)
 
         /// Soft border highlights
         public static let borderSpecular = Color.white.opacity(0.12)
         public static let borderFaint = Color.white.opacity(0.04)
+
+        // Core Brand Accent — Aura Electric Iris / Aurora Violet
+        public static let accentIris = Color(red: 0.48, green: 0.36, blue: 1.00)
+        public static let accentIrisSoft = Color(red: 0.48, green: 0.36, blue: 1.00).opacity(0.18)
 
         // Semantic Accents
         public static let accentIndigo = Color(red: 0.38, green: 0.45, blue: 1.00)
@@ -36,9 +40,9 @@ public enum ControlCenterTokens {
         /// Specular border stroke for elevated glass cards
         public static let specularBorder = LinearGradient(
             colors: [
-                Color.white.opacity(0.16),
-                Color.white.opacity(0.05),
-                Color.white.opacity(0.02)
+                Color.white.opacity(0.15),
+                Color.white.opacity(0.04),
+                Color.white.opacity(0.01)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -48,8 +52,8 @@ public enum ControlCenterTokens {
         public static func activeCapsuleGlow(color: Color) -> LinearGradient {
             LinearGradient(
                 colors: [
-                    color.opacity(0.24),
-                    color.opacity(0.08)
+                    color.opacity(0.22),
+                    color.opacity(0.06)
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
@@ -80,21 +84,40 @@ public enum ControlCenterTokens {
     // MARK: - Motion / Springs
     public enum Motion {
         /// Fluid layout transitions
-        public static let fluid = Animation.spring(response: 0.36, dampingFraction: 0.82)
+        public static let fluid = Animation.spring(response: 0.34, dampingFraction: 0.82)
 
         /// Snappy responsive hover & button interactions
-        public static let snappy = Animation.spring(response: 0.22, dampingFraction: 0.72)
+        public static let snappy = Animation.spring(response: 0.20, dampingFraction: 0.74)
 
         /// Micro-bounce for tactile feedback
-        public static let microBounce = Animation.spring(response: 0.15, dampingFraction: 0.65)
+        public static let microBounce = Animation.spring(response: 0.14, dampingFraction: 0.68)
     }
 
     // MARK: - Metrics & Radii
     public enum Radii {
-        public static let card: CGFloat = 13
-        public static let innerCard: CGFloat = 9
-        public static let capsule: CGFloat = 8
+        public static let card: CGFloat = 12
+        public static let innerCard: CGFloat = 8
+        public static let capsule: CGFloat = 7
         public static let keycap: CGFloat = 5
-        public static let button: CGFloat = 7
+        public static let button: CGFloat = 6
+    }
+
+    // MARK: - Spacing Scale (8pt Grid)
+    public enum Spacing {
+        public static let xxs: CGFloat = 2
+        public static let xs: CGFloat = 4
+        public static let s: CGFloat = 8
+        public static let m: CGFloat = 12
+        public static let l: CGFloat = 16
+        public static let xl: CGFloat = 20
+        public static let xxl: CGFloat = 24
+        public static let xxxl: CGFloat = 32
+    }
+
+    // MARK: - Stroke
+    public enum Stroke {
+        public static let hairline: CGFloat = 0.5
+        public static let subtle: CGFloat = 1.0
+        public static let focus: CGFloat = 1.5
     }
 }

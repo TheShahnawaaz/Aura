@@ -23,7 +23,8 @@ public final class SettingsWindowController: NSWindowController, NSWindowDelegat
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
         window.isMovableByWindowBackground = true
-        window.minSize = NSSize(width: 820, height: 520)
+        window.minSize = NSSize(width: 860, height: 540)
+        window.animationBehavior = .documentWindow
         window.isReleasedWhenClosed = false
         window.backgroundColor = .clear
         window.hasShadow = true

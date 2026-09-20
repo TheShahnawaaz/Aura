@@ -36,3 +36,17 @@ public protocol Connector: Sendable {
 
     func execute(tool: String, parameters: [String: String]) async throws -> String
 }
+
+public enum ConnectorError: LocalizedError {
+    case unknownTool(String)
+    case unauthenticated(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .unknownTool(let tool):
+            return "Tool '\(tool)' is not supported by this connector."
+        case .unauthenticated(let service):
+            return "Please authenticate \(service) in Aura Settings."
+        }
+    }
+}

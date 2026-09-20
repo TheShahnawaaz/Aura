@@ -43,58 +43,90 @@ public struct ControlCenterSidebarRow: View {
 
     // MARK: - Expanded Layout
     private var expandedView: some View {
-        HStack(spacing: 10) {
-            // Icon squircle badge
+        HStack(spacing: 9) {
+            // Icon squircle badge with hierarchical SF Symbol
             ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(item.iconColor.opacity(isSelected ? 0.25 : (isHovered ? 0.16 : 0.08)))
+                RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.keycap, style: .continuous)
+                    .fill(
+                        isSelected
+                            ? item.iconColor.opacity(0.20)
+                            : (isHovered ? Color.white.opacity(0.08) : Color.white.opacity(0.04))
+                    )
                     .frame(width: 26, height: 26)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.keycap, style: .continuous)
+                            .strokeBorder(
+                                isSelected
+                                    ? item.iconColor.opacity(0.35)
+                                    : (isHovered ? Color.white.opacity(0.12) : Color.white.opacity(0.03)),
+                                lineWidth: ControlCenterTokens.Stroke.hairline
+                            )
+                    )
 
                 Image(systemName: item.iconName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(isSelected ? item.iconColor : (isHovered ? .white : .white.opacity(0.7)))
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundColor(isSelected ? item.iconColor : (isHovered ? .white : .white.opacity(0.70)))
             }
 
-            // Title
+            // Title and description
             Text(item.title)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                .foregroundColor(isSelected ? .white : (isHovered ? .white.opacity(0.9) : .white.opacity(0.65)))
+                .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
+                .foregroundColor(isSelected ? .white : (isHovered ? .white.opacity(0.92) : .white.opacity(0.68)))
+                .lineLimit(1)
 
-            Spacer()
+            Spacer(minLength: 4)
 
-            // Subtle active indicator pill
-            if isSelected {
-                Circle()
-                    .fill(item.iconColor)
-                    .frame(width: 5, height: 5)
-                    .shadow(color: item.iconColor.opacity(0.8), radius: 3)
-                    .transition(.scale.combined(with: .opacity))
+            // Trailing keycap hint on hover or when selected
+            if isHovered || isSelected {
+                Text(item.shortcutString)
+                    .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                    .foregroundColor(isSelected ? item.iconColor : .white.opacity(0.40))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                            .fill(isSelected ? item.iconColor.opacity(0.16) : Color.white.opacity(0.06))
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
         .background {
             if isSelected {
-                ZStack {
-                    RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.capsule, style: .continuous)
-                        .fill(ControlCenterTokens.Gradients.activeCapsuleGlow(color: item.iconColor))
-
-                    RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.capsule, style: .continuous)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    item.iconColor.opacity(0.40),
-                                    item.iconColor.opacity(0.10)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
+                RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.capsule, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                item.iconColor.opacity(0.18),
+                                item.iconColor.opacity(0.06)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
-                }
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.capsule, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        item.iconColor.opacity(0.40),
+                                        item.iconColor.opacity(0.10)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: ControlCenterTokens.Stroke.hairline
+                            )
+                    )
             } else if isHovered {
                 RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.capsule, style: .continuous)
                     .fill(Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.capsule, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.04), lineWidth: ControlCenterTokens.Stroke.hairline)
+                    )
             }
         }
         .contentShape(Rectangle())
@@ -104,32 +136,39 @@ public struct ControlCenterSidebarRow: View {
     private var collapsedView: some View {
         ZStack {
             if isSelected {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(ControlCenterTokens.Gradients.activeCapsuleGlow(color: item.iconColor))
+                RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.innerCard, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                item.iconColor.opacity(0.22),
+                                item.iconColor.opacity(0.08)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.innerCard, style: .continuous)
                             .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        item.iconColor.opacity(0.50),
-                                        item.iconColor.opacity(0.15)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1
+                                item.iconColor.opacity(0.40),
+                                lineWidth: ControlCenterTokens.Stroke.hairline
                             )
                     )
             } else if isHovered {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.innerCard, style: .continuous)
                     .fill(Color.white.opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: ControlCenterTokens.Radii.innerCard, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.05), lineWidth: ControlCenterTokens.Stroke.hairline)
+                    )
             }
 
             Image(systemName: item.iconName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(isSelected ? item.iconColor : (isHovered ? .white : .white.opacity(0.7)))
+                .font(.system(size: 13.5, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundColor(isSelected ? item.iconColor : (isHovered ? .white : .white.opacity(0.70)))
         }
-        .frame(width: 38, height: 34)
+        .frame(width: 36, height: 32)
         .contentShape(Rectangle())
     }
 }
