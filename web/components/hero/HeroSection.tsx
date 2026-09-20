@@ -132,9 +132,6 @@ export const HeroSection: React.FC = () => {
       >
         <NotchSimulator />
       </motion.div>
-
-      {/* Bottom Vignette */}
-      <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-background via-background/80 to-transparent pointer-events-none z-20" />
     </section>
   );
 };

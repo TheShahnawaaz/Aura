@@ -179,8 +179,28 @@ export const NotchSimulator: React.FC = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [isUserInteracting, setIsUserInteracting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [notchScale, setNotchScale] = useState(0.76);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const progressRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Responsive proportional scale matching native Retina 16:10 hardware display ratio
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      if (w < 480) {
+        setNotchScale(0.52);
+      } else if (w < 768) {
+        setNotchScale(0.62);
+      } else if (w < 1024) {
+        setNotchScale(0.70);
+      } else {
+        setNotchScale(0.76);
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -327,89 +347,107 @@ export const NotchSimulator: React.FC = () => {
           transition={{ duration: 1.2, ease: "easeInOut" }}
         />
 
-        {/* Outer Machined Enclosure */}
-        <div className="double-bezel-outer w-full">
-          {/* Inner Display Bezel with Real macOS Sequoia Conifer Forest Wallpaper */}
-          <div
-            className="double-bezel-inner relative w-full h-[470px] sm:h-[530px] overflow-hidden flex flex-col items-center bg-black"
-            style={{
-              backgroundImage: "url('/wallpaper-forest.webp')",
-              backgroundSize: "cover",
-              backgroundPosition: "center 28%",
-            }}
-          >
-            {/* Dark Vignette Overlay to enhance contrast and depth */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
+        {/* PHOTOREALISTIC MACBOOK PRO ENCLOSURE (16:10 RETINA DISPLAY) */}
+        <div className="w-full flex flex-col items-center">
+          {/* Top Lid / Display Bezel */}
+          <div className="relative w-full rounded-t-[20px] rounded-b-[4px] p-2 sm:p-2.5 bg-gradient-to-b from-[#252831] via-[#16181F] to-[#0F1014] border border-white/[0.14] shadow-[0_30px_70px_-15px_rgba(0,0,0,0.95)]">
+            {/* Active Display Screen (Strict 16:10 Apple Display Aspect Ratio) */}
+            <div className="relative w-full aspect-[16/10] rounded-[10px] overflow-hidden bg-black flex flex-col items-center select-none shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+              {/* Authentic macOS Sequoia Conifer Forest Wallpaper (100% Full Bleed - No Borders) */}
+              <div
+                className="absolute inset-0 bg-cover bg-center pointer-events-none"
+                style={{
+                  backgroundImage: "url('/wallpaper-forest.webp')",
+                  backgroundPosition: "center 24%",
+                }}
+              />
 
-            {/* Native macOS Sequoia Menubar */}
-            <div className="w-full h-7 px-4 flex items-center justify-between text-[11px] font-medium text-slate-200 z-20 backdrop-blur-md bg-black/25 border-b border-white/[0.06]">
-              <div className="flex items-center gap-3.5">
-                <span className="text-white text-xs font-semibold"></span>
-                <span className="font-semibold text-white">Finder</span>
-                <span className="hidden sm:inline text-slate-300">File</span>
-                <span className="hidden sm:inline text-slate-300">Edit</span>
-                <span className="hidden sm:inline text-slate-300">View</span>
-                <span className="hidden sm:inline text-slate-300">Go</span>
-                <span className="hidden sm:inline text-slate-300">Window</span>
-                <span className="hidden sm:inline text-slate-300">Help</span>
-              </div>
+              {/* Cinematic Vignette */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/50 pointer-events-none" />
 
-              <div className="flex items-center gap-3 text-slate-300">
-                <Battery className="w-3.5 h-3.5 opacity-90" />
-                <Wifi className="w-3.5 h-3.5 opacity-90" />
-                <Search className="w-3 h-3 opacity-90" />
-                <Sliders className="w-3 h-3 opacity-90" />
-                <span className="font-mono text-[10.5px] tracking-tight text-white font-medium">
-                  Mon 10:42 AM
-                </span>
-              </div>
-            </div>
-
-            {/* Floating macOS Dock at Bottom */}
-            <div className="absolute bottom-3 self-center flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/[0.08] shadow-[0_10px_30px_rgba(0,0,0,0.6)] z-20">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-400 flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
-                Finder
-              </div>
-
-              <div className="w-8 h-8 rounded-xl bg-[#111318] border border-white/15 flex items-center justify-center shadow-sm">
-                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-
-              {/* Aura Active Icon with Running Dot */}
-              <div className="relative flex flex-col items-center">
-                <div className="w-8 h-8 rounded-xl overflow-hidden shadow-lg border border-white/25 ring-1 ring-iris-500/50">
-                  <Image
-                    src="/icon.png"
-                    alt="Aura Dock Icon"
-                    width={32}
-                    height={32}
-                    className="object-cover"
-                  />
+              {/* Native macOS Sequoia Menubar (26px height - exactly flush with scaled idle notch) */}
+              <div className="w-full h-[26px] px-3.5 flex items-center justify-between text-[10.5px] font-medium text-slate-200 z-20 backdrop-blur-md bg-black/25 border-b border-white/[0.06]">
+                {/* Left System Items */}
+                <div className="flex items-center gap-3">
+                  <span className="text-white text-xs font-semibold"></span>
+                  <span className="font-semibold text-white">Finder</span>
+                  <span className="hidden md:inline text-slate-300">File</span>
+                  <span className="hidden md:inline text-slate-300">Edit</span>
+                  <span className="hidden lg:inline text-slate-300">View</span>
+                  <span className="hidden lg:inline text-slate-300">Go</span>
+                  <span className="hidden xl:inline text-slate-300">Window</span>
+                  <span className="hidden xl:inline text-slate-300">Help</span>
                 </div>
-                <div className="w-1 h-1 rounded-full bg-white/95 mt-1 shadow-sm" />
-              </div>
-            </div>
 
-            {/* THE PHYSICAL MACBOOK NOTCH HUD */}
-            <motion.div
-              animate={{
-                width: current.width,
-                height: current.height,
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 380,
-                damping: 30,
-                mass: 0.85,
-              }}
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
-              className="absolute top-0 z-40 flex flex-col items-center"
-              style={{
-                width: `${current.width}px`,
-                height: `${current.height}px`,
-              }}
-            >
+                {/* Right Status Items matching screenshot */}
+                <div className="flex items-center gap-2.5 text-slate-300">
+                  <span className="text-slate-400 text-[10.5px]">✦</span>
+                  <span className="text-slate-400 font-semibold text-[10px]">A</span>
+                  <Battery className="w-3.5 h-3.5 opacity-85" />
+                  <Wifi className="w-3 h-3 opacity-85" />
+                  <Search className="w-2.5 h-2.5 opacity-85" />
+                  <Sliders className="w-2.5 h-2.5 opacity-85" />
+                  <span className="font-mono text-[9.5px] tracking-tight text-white font-medium">
+                    Mon 10:42 AM
+                  </span>
+                </div>
+              </div>
+
+              {/* Floating macOS Dock */}
+              <div className="absolute bottom-2.5 sm:bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-black/40 backdrop-blur-2xl border border-white/[0.10] shadow-[0_12px_32px_rgba(0,0,0,0.65)] z-20">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-sky-600 to-sky-400 flex items-center justify-center text-white text-[9px] sm:text-[10px] font-bold shadow-sm">
+                  Finder
+                </div>
+
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#111318] border border-white/15 flex items-center justify-center shadow-sm">
+                  <Terminal className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" />
+                </div>
+
+                {/* Aura Active Icon with Running Dot */}
+                <div className="relative flex flex-col items-center">
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl overflow-hidden shadow-lg border border-white/25 ring-1 ring-iris-500/50">
+                    <Image
+                      src="/icon.png"
+                      alt="Aura Dock Icon"
+                      width={32}
+                      height={32}
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-white/95 mt-0.5 shadow-sm" />
+                </div>
+              </div>
+
+              {/* PROPORTIONALLY SCALED NOTCH MOUNT */}
+              <div
+                className="absolute top-0 left-1/2 -translate-x-1/2 z-40 pointer-events-auto"
+                style={{
+                  width: `${current.width * notchScale}px`,
+                  height: `${current.height * notchScale}px`,
+                  transition: "width 0.35s cubic-bezier(0.16, 1, 0.3, 1), height 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+                }}
+              >
+                <motion.div
+                  animate={{
+                    width: current.width,
+                    height: current.height,
+                  }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 380,
+                    damping: 30,
+                    mass: 0.85,
+                  }}
+                  onMouseEnter={() => setIsHovered(true)}
+                  onMouseLeave={() => setIsHovered(false)}
+                  className="relative flex flex-col items-center"
+                  style={{
+                    width: `${current.width}px`,
+                    height: `${current.height}px`,
+                    transform: `scale(${notchScale})`,
+                    transformOrigin: "top center",
+                  }}
+                >
               {/* Silhouette SVG Layer with Apple Reverse Fillet Ears & Specular Contour */}
               <svg
                 className="absolute inset-0 w-full h-full pointer-events-none drop-shadow-[0_20px_40px_rgba(0,0,0,0.95)]"
@@ -732,6 +770,19 @@ export const NotchSimulator: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* LOWER MACBOOK UNIBODY CHASSIS (ALUMINUM DECK & THUMB SCOOP) */}
+      <div className="relative w-[101.5%] -left-[0.75%] h-[14px] sm:h-[18px] bg-gradient-to-b from-[#282B34] via-[#1C1E25] to-[#121418] border-t border-white/[0.22] rounded-b-[10px] shadow-[0_20px_45px_-10px_rgba(0,0,0,0.95)] z-10 flex items-start justify-center">
+        {/* Display Hinge Center Line */}
+        <div className="absolute -top-[3px] inset-x-8 h-[3px] bg-[#0A0B0E] rounded-t-sm" />
+        {/* Iconic Centered Lid Opening Thumb Scoop */}
+        <div className="w-20 sm:w-28 h-[5px] sm:h-[6px] rounded-b-[6px] bg-[#090A0D] border-b border-white/[0.12] shadow-[inset_0_2px_4px_rgba(0,0,0,0.85)]" />
+      </div>
+
+      {/* Ambient Desk Reflection Shadow */}
+      <div className="w-[88%] mx-auto h-[12px] bg-black/80 blur-[14px] rounded-full mt-0.5 pointer-events-none" />
+    </div>
+  </div>
 
       {/* State Switcher Tabs (All 5 states from user screenshots) */}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-1.5 p-1 rounded-full bg-[#090B10]/90 border border-white/[0.07] backdrop-blur-xl shadow-hairline">

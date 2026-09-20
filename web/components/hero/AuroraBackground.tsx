@@ -1,8 +1,26 @@
 "use client";
 
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useState, useEffect, Component } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+
+class WebGLErrorBoundary extends Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch() {}
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
 
 function AuroraParticles({ count = 800 }: { count?: number }) {
   const mesh = useRef<THREE.Points>(null);
@@ -196,21 +214,47 @@ function AuroraMesh() {
 }
 
 export function AuroraBackground() {
+  const [canRenderWebGL, setCanRenderWebGL] = useState(false);
+
+  useEffect(() => {
+    try {
+      const canvas = document.createElement("canvas");
+      const gl =
+        canvas.getContext("webgl", { powerPreference: "default" }) ||
+        canvas.getContext("experimental-webgl");
+      if (gl) {
+        setCanRenderWebGL(true);
+      }
+    } catch {
+      setCanRenderWebGL(false);
+    }
+  }, []);
+
+  const cssFallback = (
+    <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(99,102,241,0.18),rgba(168,85,247,0.12),rgba(5,6,8,0)_75%)] pointer-events-none" />
+  );
+
+  if (!canRenderWebGL) {
+    return cssFallback;
+  }
+
   return (
-    <div className="absolute inset-0 -z-10 opacity-70">
-      <Canvas
-        camera={{ position: [0, 0, 5], fov: 60 }}
-        gl={{
-          antialias: false,
-          alpha: true,
-          powerPreference: "default",
-        }}
-        dpr={[1, 1.5]}
-        style={{ background: "transparent" }}
-      >
-        <AuroraMesh />
-        <AuroraParticles count={600} />
-      </Canvas>
-    </div>
+    <WebGLErrorBoundary fallback={cssFallback}>
+      <div className="absolute inset-0 -z-10 opacity-70">
+        <Canvas
+          camera={{ position: [0, 0, 5], fov: 60 }}
+          gl={{
+            antialias: false,
+            alpha: true,
+            powerPreference: "default",
+          }}
+          dpr={[1, 1.5]}
+          style={{ background: "transparent" }}
+        >
+          <AuroraMesh />
+          <AuroraParticles count={600} />
+        </Canvas>
+      </div>
+    </WebGLErrorBoundary>
   );
 }
