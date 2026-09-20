@@ -3,13 +3,13 @@ import Foundation
 /// Single source of truth for version and distribution metadata in Aura.
 public enum AuraVersion {
     /// Current semantic version string (e.g. "1.0.0").
-    public static let current = "1.0.0"
+    public static let current = "1.1.0"
 
     /// Internal build number string (e.g. "1").
-    public static let build = "1"
+    public static let build = "2"
 
     /// Release date string for this build.
-    public static let releaseDate = "2026-09-14"
+    public static let releaseDate = "2026-09-21"
 
     /// Public GitHub repository identifier.
     public static let repository = "TheShahnawaaz/Aura"
@@ -29,7 +29,7 @@ public enum AuraVersion {
         URL(string: "https://github.com/\(repository)/releases")!
     }
 
-    /// Formatted display string, e.g. "v1.0.0 (Build 1)".
+    /// Formatted display string, e.g. "v1.1.0 (Build 2)".
     public static var displayString: String {
         "v\(current) (Build \(build))"
     }

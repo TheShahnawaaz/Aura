@@ -58,7 +58,7 @@ export const HeroSection: React.FC = () => {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
           </span>
-          <span className="text-white font-semibold">Aura v0.1.0</span>
+          <span className="text-white font-semibold">Aura v1.1.0</span>
           <span className="text-slate-600">·</span>
           <span className="text-slate-400 font-mono text-[11px]">
             Native Swift · Apple Silicon & macOS Sequoia

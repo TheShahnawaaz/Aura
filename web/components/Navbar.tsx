@@ -78,7 +78,7 @@ export const Navbar: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="font-bold tracking-tight text-white text-sm">Aura</span>
               <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-iris-500/15 text-iris-300 border border-iris-500/25">
-                v0.1.0
+                v1.1.0
               </span>
             </div>
           </motion.a>
